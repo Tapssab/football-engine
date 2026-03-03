@@ -442,7 +442,7 @@ table.ftable tbody tr.hot td:first-child{box-shadow:inset 2px 0 0 var(--accent)}
 <div class="topbar">
   <div style="display:flex;align-items:center;gap:12px">
     <button class="back-btn" onclick="goHome()">← Sports</button>
-    <div class="tbl">
+    <div class="tbl" onclick="resetApp()" title="Click to reset" style="cursor:pointer;transition:opacity .15s" onmouseover="this.style.opacity='.75'" onmouseout="this.style.opacity='1'">
       <div class="tbl-icon">⚽</div>
       <div>
         <div class="tbl-title">Football Analytics Engine</div>
@@ -687,11 +687,10 @@ table.ftable tbody tr.hot td:first-child{box-shadow:inset 2px 0 0 var(--accent)}
 // LANDING PAGE — Sport Router
 // ═══════════════════════════════════════════════
 function launchSport(sport) {
-  if (sport !== 'football') return; // others not yet built
+  if (sport !== 'football') return;
   document.getElementById('landingPage').style.display = 'none';
   const shell = document.getElementById('appShell');
   shell.classList.add('active');
-  // fade in
   shell.style.opacity = '0';
   shell.style.transition = 'opacity .3s ease';
   requestAnimationFrame(() => { shell.style.opacity = '1'; });
@@ -700,6 +699,43 @@ function launchSport(sport) {
 function goHome() {
   document.getElementById('appShell').classList.remove('active');
   document.getElementById('landingPage').style.display = 'flex';
+}
+
+function resetApp() {
+  // Clear all loaded data
+  histSheets = {}; fixSheets = null;
+  masterIdx = {}; matchStore = {};
+  allRows = []; visRows = []; loadedFiles = [];
+  _leagueOSIs = []; _eloRatings = new Map();
+
+  // Reset file inputs so same file can be re-added
+  const fa = document.getElementById('fileA');
+  const fb = document.getElementById('fileB');
+  if (fa) fa.value = '';
+  if (fb) fb.value = '';
+
+  // Reset UI
+  document.getElementById('fileList').querySelectorAll('.file-item').forEach(el => el.remove());
+  document.getElementById('fileEmptyMsg').style.display = '';
+  document.getElementById('stB').textContent = '';
+  document.getElementById('cardB').classList.remove('active');
+  document.getElementById('topStats').style.display = 'none';
+  document.getElementById('filterSection').style.display = 'none';
+  document.getElementById('resultsArea').style.display = 'none';
+  document.getElementById('emptyState').style.display = '';
+  document.getElementById('tBody').innerHTML = '<tr><td colspan="9" class="no-data">Run Analysis to see predictions</td></tr>';
+  document.getElementById('logBar').innerHTML = '';
+  document.getElementById('logBar').classList.remove('on');
+  document.getElementById('runBtn').disabled = true;
+  document.getElementById('csvBtn').disabled = true;
+  document.getElementById('jsonBtn').disabled = true;
+  document.getElementById('gamesBtn').disabled = true;
+
+  // Reset filter inputs
+  F_IDS.forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+
+  // Close drawer if open
+  closeDrawer();
 }
 
 // ═══════════════════════════════════════════════
