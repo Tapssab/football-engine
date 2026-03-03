@@ -310,16 +310,144 @@ table.ftable tbody tr.hot td:first-child{box-shadow:inset 2px 0 0 var(--accent)}
   .app{flex-direction:column}
   .grid{grid-template-columns:1fr}
 }
+/* ═══════════════════════════════════════════════════
+   LANDING PAGE — Sport Selector
+   ═══════════════════════════════════════════════════ */
+#landingPage {
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  min-height:100vh; padding:40px 20px;
+  background:var(--bg);
+  position:relative; z-index:1;
+}
+.land-logo {
+  font-size:2.8rem; margin-bottom:8px; filter:drop-shadow(0 0 24px rgba(0,229,160,.4));
+}
+.land-title {
+  font-family:var(--sans); font-size:1.6rem; font-weight:800;
+  color:var(--t1); letter-spacing:-0.5px; margin-bottom:6px; text-align:center;
+}
+.land-sub {
+  font-family:var(--mono); font-size:.65rem; color:var(--t3);
+  letter-spacing:2px; text-transform:uppercase; margin-bottom:48px; text-align:center;
+}
+.sport-grid {
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+  gap:18px; width:100%; max-width:760px;
+}
+.sport-card {
+  background:var(--glass);
+  border:1px solid var(--gb);
+  border-radius:16px;
+  padding:32px 20px 28px;
+  display:flex; flex-direction:column; align-items:center; gap:12px;
+  cursor:pointer;
+  transition:transform .18s, border-color .18s, background .18s, box-shadow .18s;
+  position:relative; overflow:hidden; text-align:center;
+  text-decoration:none;
+}
+.sport-card::before {
+  content:''; position:absolute; inset:0;
+  background:radial-gradient(ellipse 80% 60% at 50% 0%, rgba(0,229,160,.07) 0%, transparent 70%);
+  opacity:0; transition:opacity .2s;
+}
+.sport-card:hover { transform:translateY(-4px); border-color:var(--accent); background:var(--glass-h); box-shadow:0 8px 32px rgba(0,229,160,.12); }
+.sport-card:hover::before { opacity:1; }
+.sport-card.coming-soon { cursor:default; opacity:.5; }
+.sport-card.coming-soon:hover { transform:none; border-color:var(--gb); background:var(--glass); box-shadow:none; }
+.sport-card.coming-soon:hover::before { opacity:0; }
+.sc-icon { font-size:2.4rem; line-height:1; filter:drop-shadow(0 2px 8px rgba(0,0,0,.4)); }
+.sc-name { font-family:var(--sans); font-size:.9rem; font-weight:700; color:var(--t1); letter-spacing:-.2px; }
+.sc-desc { font-family:var(--mono); font-size:.58rem; color:var(--t3); line-height:1.5; }
+.sc-badge {
+  position:absolute; top:12px; right:12px;
+  font-family:var(--mono); font-size:.48rem; font-weight:700; letter-spacing:1.2px;
+  text-transform:uppercase; padding:3px 8px; border-radius:4px;
+}
+.sc-badge.live { background:rgba(0,229,160,.12); color:var(--accent); border:1px solid rgba(0,229,160,.25); }
+.sc-badge.soon { background:rgba(255,255,255,.05); color:var(--t3); border:1px solid var(--gb); }
+.land-footer {
+  margin-top:48px; font-family:var(--mono); font-size:.55rem;
+  color:var(--t3); letter-spacing:1px; text-align:center;
+}
+
+/* App shell — hidden until a sport is selected */
+#appShell { display:none; flex-direction:column; height:100vh; }
+#appShell.active { display:flex; }
+
+/* Back button in topbar */
+.back-btn {
+  display:flex; align-items:center; gap:6px;
+  background:var(--glass); border:1px solid var(--gb); border-radius:var(--rs);
+  color:var(--t2); font-family:var(--mono); font-size:.58rem;
+  letter-spacing:.8px; padding:6px 12px; cursor:pointer; transition:var(--tr);
+  text-transform:uppercase;
+}
+.back-btn:hover { border-color:var(--accent); color:var(--accent); }
 </style>
 </head>
 <body>
 
+<!-- ═══════════════════════════════════════════
+     LANDING PAGE
+     ═══════════════════════════════════════════ -->
+<div id="landingPage">
+  <div class="land-logo">📊</div>
+  <div class="land-title">Analytics Engine</div>
+  <div class="land-sub">Select a sport to begin</div>
+
+  <div class="sport-grid">
+
+    <!-- FOOTBALL — live -->
+    <div class="sport-card" onclick="launchSport('football')">
+      <span class="sc-badge live">Live</span>
+      <div class="sc-icon">⚽</div>
+      <div class="sc-name">Football</div>
+      <div class="sc-desc">Poisson · Elo · Ensemble<br>O/U · BTTS · Confidence</div>
+    </div>
+
+    <!-- TENNIS — coming soon -->
+    <div class="sport-card coming-soon">
+      <span class="sc-badge soon">Soon</span>
+      <div class="sc-icon">🎾</div>
+      <div class="sc-name">Tennis</div>
+      <div class="sc-desc">Serve stats · Surface<br>H2H · Set prediction</div>
+    </div>
+
+    <!-- BASKETBALL — coming soon -->
+    <div class="sport-card coming-soon">
+      <span class="sc-badge soon">Soon</span>
+      <div class="sc-icon">🏀</div>
+      <div class="sc-name">Basketball</div>
+      <div class="sc-desc">Pace · Efficiency<br>Spread · Over/Under</div>
+    </div>
+
+    <!-- BASEBALL — coming soon -->
+    <div class="sport-card coming-soon">
+      <span class="sc-badge soon">Soon</span>
+      <div class="sc-icon">⚾</div>
+      <div class="sc-name">Baseball</div>
+      <div class="sc-desc">Run line · Totals<br>Pitcher matchups</div>
+    </div>
+
+  </div>
+
+  <div class="land-footer">Analytics Engine · v4 · All models run client-side</div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     APP SHELL (contains sport engines)
+     ═══════════════════════════════════════════ -->
+<div id="appShell">
+
 <div class="topbar">
-  <div class="tbl">
-    <div class="tbl-icon">⚽</div>
-    <div>
-      <div class="tbl-title">Football Analytics Engine</div>
-      <div class="tbl-sub">Poisson · Multi-Source · v3</div>
+  <div style="display:flex;align-items:center;gap:12px">
+    <button class="back-btn" onclick="goHome()">← Sports</button>
+    <div class="tbl">
+      <div class="tbl-icon">⚽</div>
+      <div>
+        <div class="tbl-title">Football Analytics Engine</div>
+        <div class="tbl-sub">Poisson · Multi-Source · v4</div>
+      </div>
     </div>
   </div>
   <div class="tb-stats" id="topStats" style="display:none">
@@ -552,7 +680,28 @@ table.ftable tbody tr.hot td:first-child{box-shadow:inset 2px 0 0 var(--accent)}
   <div class="d-body" id="dBody"></div>
 </div>
 
+</div><!-- /appShell -->
+
 <script>
+// ═══════════════════════════════════════════════
+// LANDING PAGE — Sport Router
+// ═══════════════════════════════════════════════
+function launchSport(sport) {
+  if (sport !== 'football') return; // others not yet built
+  document.getElementById('landingPage').style.display = 'none';
+  const shell = document.getElementById('appShell');
+  shell.classList.add('active');
+  // fade in
+  shell.style.opacity = '0';
+  shell.style.transition = 'opacity .3s ease';
+  requestAnimationFrame(() => { shell.style.opacity = '1'; });
+}
+
+function goHome() {
+  document.getElementById('appShell').classList.remove('active');
+  document.getElementById('landingPage').style.display = 'flex';
+}
+
 // ═══════════════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════════════
