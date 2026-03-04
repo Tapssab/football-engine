@@ -753,7 +753,13 @@ async function loadFromDrive() {
           headers: { Authorization: 'Bearer ' + driveAccessToken }
         });
         const searchData = await searchRes.json();
+        log(`Drive search [${filename}]: status=${searchRes.status} files=${searchData.files?searchData.files.length:'err'} ${searchData.error?JSON.stringify(searchData.error):''}`, 'ok');
 
+        if (searchData.error) {
+          log(`Drive API error for ${filename}: ${JSON.stringify(searchData.error)}`, 'err');
+          errors.push(filename);
+          continue;
+        }
         if (!searchData.files || searchData.files.length === 0) {
           skipped++;
           log(`Drive: ${filename} not found in folder — skipping`, 'err');
@@ -832,7 +838,7 @@ function getGoogleAccessToken() {
     // Google OAuth2 implicit flow — opens a small popup for sign-in
     const client = google.accounts.oauth2.initTokenClient({
       client_id: '591112365835-jgof6m331fql9vla8ep1fkqc4fq4f9mr.apps.googleusercontent.com',
-      scope: 'https://www.googleapis.com/auth/drive.readonly',
+      scope: 'https://www.googleapis.com/auth/drive',
       callback: (tokenResponse) => {
         if (tokenResponse.error) { rej(new Error(tokenResponse.error)); return; }
         res(tokenResponse.access_token);
