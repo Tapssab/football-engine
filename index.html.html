@@ -383,6 +383,15 @@ table.ftable tbody tr.hot td:first-child{box-shadow:inset 2px 0 0 var(--accent)}
   text-transform:uppercase;
 }
 .back-btn:hover { border-color:var(--accent); color:var(--accent); }
+/* ── Google Drive loader ── */
+.drive-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:10px;background:rgba(66,133,244,.1);border:1px solid rgba(66,133,244,.3);border-radius:var(--rs);color:#4285f4;font-size:.7rem;font-weight:600;cursor:pointer;transition:var(--tr);margin-top:7px}
+.drive-btn:hover{background:rgba(66,133,244,.18);border-color:rgba(66,133,244,.55)}
+.drive-btn:disabled{opacity:.4;cursor:not-allowed}
+.drive-btn svg{flex-shrink:0}
+.drive-status{font-family:var(--mono);font-size:.58rem;margin-top:6px;padding:6px 8px;border-radius:5px;display:none}
+.drive-status.ok{display:block;background:rgba(0,229,160,.08);color:var(--accent);border:1px solid rgba(0,229,160,.2)}
+.drive-status.err{display:block;background:rgba(255,77,109,.08);color:var(--a2);border:1px solid rgba(255,77,109,.2)}
+.drive-status.loading{display:block;background:rgba(66,133,244,.08);color:#4285f4;border:1px solid rgba(66,133,244,.2)}
 </style>
 </head>
 <body>
@@ -474,6 +483,19 @@ table.ftable tbody tr.hot td:first-child{box-shadow:inset 2px 0 0 var(--accent)}
         <span class="add-file-plus">＋</span>
         <span>Add Results File</span>
       </div>
+      <!-- Google Drive loader -->
+      <button class="drive-btn" id="driveBtn" onclick="loadFromDrive()">
+        <svg width="16" height="16" viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg">
+          <path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/>
+          <path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z" fill="#00ac47"/>
+          <path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#ea4335"/>
+          <path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/>
+          <path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/>
+          <path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 28h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/>
+        </svg>
+        Load from Google Drive
+      </button>
+      <div class="drive-status" id="driveStatus"></div>
     </div>
 
     <div>
@@ -683,6 +705,143 @@ table.ftable tbody tr.hot td:first-child{box-shadow:inset 2px 0 0 var(--accent)}
 </div><!-- /appShell -->
 
 <script>
+// ═══════════════════════════════════════════════
+// GOOGLE DRIVE LOADER
+// ═══════════════════════════════════════════════
+const DRIVE_FOLDER_ID = '1FSKEeRH22QXiPPNZ6FmTtC1yuQqKkCtK';
+
+// These are the 4 exact filenames saved by the Apps Script
+const DRIVE_FILES = [
+  'Latest_Results_Main.xlsx',
+  'All_Euro_Data_2526.xlsx',
+  'New_Leagues_Data.xlsx',
+  'Latest_Results_New.xlsx'
+];
+
+let driveAccessToken = null;
+
+function driveStatus(msg, type) {
+  const el = document.getElementById('driveStatus');
+  el.textContent = msg;
+  el.className = 'drive-status ' + type;
+}
+
+async function loadFromDrive() {
+  const btn = document.getElementById('driveBtn');
+  btn.disabled = true;
+  driveStatus('Signing in to Google…', 'loading');
+
+  try {
+    // Load the Google Identity Services script if not already loaded
+    if (!window.google || !window.google.accounts) {
+      await loadScript('https://accounts.google.com/gsi/client');
+    }
+
+    // Request an access token with Drive read scope
+    driveAccessToken = await getGoogleAccessToken();
+    driveStatus('Connected — fetching files from Drive…', 'loading');
+
+    let loaded = 0;
+    let skipped = 0;
+    const errors = [];
+
+    for (const filename of DRIVE_FILES) {
+      try {
+        // Search for the file by name inside the folder
+        const searchUrl = `https://www.googleapis.com/drive/v3/files?q=name='${filename}'+and+'${DRIVE_FOLDER_ID}'+in+parents+and+trashed=false&fields=files(id,name,modifiedTime)`;
+        const searchRes = await fetch(searchUrl, {
+          headers: { Authorization: 'Bearer ' + driveAccessToken }
+        });
+        const searchData = await searchRes.json();
+
+        if (!searchData.files || searchData.files.length === 0) {
+          skipped++;
+          log(`Drive: ${filename} not found in folder — skipping`, 'err');
+          continue;
+        }
+
+        const fileId = searchData.files[0].id;
+        const modified = new Date(searchData.files[0].modifiedTime).toLocaleDateString();
+
+        // Download the file content
+        const dlRes = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+          headers: { Authorization: 'Bearer ' + driveAccessToken }
+        });
+
+        if (!dlRes.ok) {
+          errors.push(filename);
+          continue;
+        }
+
+        const arrayBuffer = await dlRes.arrayBuffer();
+        const wb = XLSX.read(arrayBuffer, { type: 'array' });
+        const sheets = {};
+        for (const n of wb.SheetNames) {
+          sheets[n] = XLSX.utils.sheet_to_json(wb.Sheets[n], { defval: '', raw: false });
+        }
+
+        // Skip if already loaded
+        if (loadedFiles.includes(filename)) {
+          // Re-load with fresh data (replace)
+          Object.keys(histSheets).filter(k => k.startsWith(filename + '::')).forEach(k => delete histSheets[k]);
+          loadedFiles.splice(loadedFiles.indexOf(filename), 1);
+        }
+
+        for (const [sh, rows] of Object.entries(sheets)) {
+          histSheets[`${filename}::${sh}`] = rows;
+        }
+        loadedFiles.push(filename);
+        loaded++;
+        log(`✓ Drive: ${filename} (updated ${modified})`, 'ok');
+
+      } catch (e) {
+        errors.push(filename);
+        log(`Drive error — ${filename}: ${e.message}`, 'err');
+      }
+    }
+
+    rebuildIndex();
+    renderFileList();
+
+    if (loaded > 0) {
+      driveStatus(`✓ ${loaded} file${loaded>1?'s':''} loaded from Drive`, 'ok');
+      log(`Drive sync complete — ${Object.keys(masterIdx).length} teams indexed`, 'ok');
+    } else {
+      driveStatus('No files found — run the Apps Script sync first', 'err');
+    }
+
+  } catch (e) {
+    driveStatus('Sign-in failed or cancelled', 'err');
+    log('Drive: ' + e.message, 'err');
+  }
+
+  btn.disabled = false;
+}
+
+function loadScript(src) {
+  return new Promise((res, rej) => {
+    if (document.querySelector(`script[src="${src}"]`)) { res(); return; }
+    const s = document.createElement('script');
+    s.src = src; s.onload = res; s.onerror = rej;
+    document.head.appendChild(s);
+  });
+}
+
+function getGoogleAccessToken() {
+  return new Promise((res, rej) => {
+    // Google OAuth2 implicit flow — opens a small popup for sign-in
+    const client = google.accounts.oauth2.initTokenClient({
+      client_id: 'YOUR_GOOGLE_CLIENT_ID', // ← you will replace this
+      scope: 'https://www.googleapis.com/auth/drive.readonly',
+      callback: (tokenResponse) => {
+        if (tokenResponse.error) { rej(new Error(tokenResponse.error)); return; }
+        res(tokenResponse.access_token);
+      }
+    });
+    client.requestAccessToken({ prompt: 'consent' });
+  });
+}
+
 // ═══════════════════════════════════════════════
 // LANDING PAGE — Sport Router
 // ═══════════════════════════════════════════════
