@@ -639,7 +639,7 @@ table.ftable tbody tr.hot td:first-child{box-shadow:inset 2px 0 0 var(--accent)}
                     <option value="">All</option>
                     <option value="full">Full sample (N≥10)</option>
                     <option value="low">Low sample (N&lt;10)</option>
-                    <option value="found">Both found</option>
+                    <option value="found" selected>Both found</option>
                     <option value="missing">Missing data</option>
                   </select>
                 </div>
@@ -652,7 +652,7 @@ table.ftable tbody tr.hot td:first-child{box-shadow:inset 2px 0 0 var(--accent)}
                 <div class="fp-fg fp-full"><label>Form Diff (any direction) ≥</label><input type="number" id="fFormDiff" step="1" min="0" max="100" placeholder="e.g. 30"></div>
                 <div class="fp-fg"><label>Match BTTS % ≥</label><input type="number" id="fMbtts" step="1" min="0" max="100" placeholder="min"></div>
                 <div class="fp-fg"><label>Match BTTS % ≤</label><input type="number" id="fMbttsMax" step="1" min="0" max="100" placeholder="max"></div>
-                <div class="fp-fg fp-full"><label>Confidence % ≥ <span style="font-size:.48rem;color:var(--accent)">(Ensemble mode)</span></label><input type="number" id="fConf" step="1" min="0" max="100" placeholder="e.g. 60"></div>
+                <div class="fp-fg fp-full"><label>Confidence % ≥ <span style="font-size:.48rem;color:var(--accent)">(Ensemble mode)</span></label><input type="number" id="fConf" step="1" min="0" max="100" value="60" placeholder="e.g. 60"></div>
                 <div class="fp-fg fp-full"><label>C-Signal <span style="font-size:.48rem;color:#e0c97f">(Conservative O/U)</span></label><select id="fConservSig"><option value="">All</option><option value="over">Strong Over</option><option value="under">Strong Under</option><option value="none">No Edge</option></select></div>
                 <button class="fp-reset" id="resetBtn">✕ Reset Filters</button>
               </div>
@@ -898,6 +898,8 @@ function resetApp() {
 
   // Reset filter inputs
   F_IDS.forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  document.getElementById('fQuality').value = 'found';
+  document.getElementById('fConf').value = '60';
 
   // Close drawer if open
   closeDrawer();
@@ -1701,7 +1703,12 @@ function applyFilters(){
 
 F_IDS.forEach(id=>document.getElementById(id).addEventListener('input',applyFilters));
 document.getElementById('sortSel').addEventListener('change',applyFilters);
-document.getElementById('resetBtn').addEventListener('click',()=>{F_IDS.forEach(id=>document.getElementById(id).value='');applyFilters();});
+document.getElementById('resetBtn').addEventListener('click',()=>{
+  F_IDS.forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+  document.getElementById('fQuality').value='found';
+  document.getElementById('fConf').value='60';
+  applyFilters();
+});
 document.getElementById('fToggleBtn').addEventListener('click',e=>{
   e.stopPropagation();
   const btn=document.getElementById('fToggleBtn');
