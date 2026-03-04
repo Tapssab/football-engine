@@ -831,7 +831,7 @@ function getGoogleAccessToken() {
   return new Promise((res, rej) => {
     // Google OAuth2 implicit flow — opens a small popup for sign-in
     const client = google.accounts.oauth2.initTokenClient({
-      client_id: 'YOUR_GOOGLE_CLIENT_ID', // ← you will replace this
+      client_id: '591112365835-jgof6m331fql9vla8ep1fkqc4fq4f9mr.apps.googleusercontent.com',
       scope: 'https://www.googleapis.com/auth/drive.readonly',
       callback: (tokenResponse) => {
         if (tokenResponse.error) { rej(new Error(tokenResponse.error)); return; }
