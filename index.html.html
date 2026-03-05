@@ -516,6 +516,14 @@ table.ftable tbody tr.hot td:first-child{box-shadow:inset 2px 0 0 var(--accent)}
         <input type="range" id="nSlider" min="3" max="20" value="10">
         <div class="sl-val" id="nVal">10</div>
       </div>
+      <div class="sl-row">
+        <div class="sl-lbl" title="Exponential decay: 1.0 = equal weight, 0.7 = recent games weighted heavily">Recency α</div>
+        <input type="range" id="decaySlider" min="60" max="100" value="85" step="1">
+        <div class="sl-val" id="decayVal">0.85</div>
+      </div>
+      <div style="font-family:var(--mono);font-size:.52rem;color:var(--t3);margin-top:2px;line-height:1.5">
+        1.00 = equal weight · 0.70 = heavy recency
+      </div>
     </div>
 
     <div>
@@ -871,7 +879,7 @@ function resetApp() {
   histSheets = {}; fixSheets = null;
   masterIdx = {}; matchStore = {};
   allRows = []; visRows = []; loadedFiles = [];
-  _leagueOSIs = []; _eloRatings = new Map();
+  _leagueOSIs = []; _eloRatings = new Map(); _leagueParams = {}; _teamRatings = {};
 
   // Reset file inputs so same file can be re-added
   const fa = document.getElementById('fileA');
@@ -900,6 +908,8 @@ function resetApp() {
   F_IDS.forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
   document.getElementById('fQuality').value = 'found';
   document.getElementById('fConf').value = '60';
+  document.getElementById('decaySlider').value = '85';
+  document.getElementById('decayVal').textContent = '0.85';
 
   // Close drawer if open
   closeDrawer();
@@ -1056,14 +1066,180 @@ function computeOSI(opponentName,n){
  * Build league-wide OSI list for z-score normalisation.
  * Called once per Run so the distribution is stable.
  */
-function buildLeagueOSIs(n){
-  // collect every canonical team name in the store
+// ═══════════════════════════════════════════════════════════════════════
+// ── ATTACK / DEFENCE STRENGTH MODEL + HOME ADVANTAGE ──────────────────
+//
+// For each league, compute:
+//   leagueAvgScored   = mean goals scored per game across all teams
+//   leagueAvgConceded = mean goals conceded per game (= leagueAvgScored)
+//   homeAdv           = ratio of home goals to away goals in this league
+//                       (data-derived, not hardcoded)
+//
+// For each team:
+//   attackRating  = team_avg_scored   / leagueAvgScored
+//   defenceRating = team_avg_conceded / leagueAvgConceded
+//
+// Final λ (Dixon-Coles style):
+//   λ_home = homeAttack  × awayDefence  × leagueAvgScored  × homeAdvFactor
+//   λ_away = awayAttack  × homeDefence  × leagueAvgScored  × awayAdvFactor
+//
+// homeAdvFactor = sqrt(homeAdv),  awayAdvFactor = 1/sqrt(homeAdv)
+// Using sqrt so both sides share the adjustment symmetrically.
+// ═══════════════════════════════════════════════════════════════════════
+
+let _leagueParams = {};      // populated on each Run, keyed by league name
+let _teamRatings  = {};      // populated on each Run, keyed by team canonical name
+
+/**
+ * Build per-league parameters from loaded match data.
+ * Returns object: { [leagueName]: { avgScored, homeAdv, homeAdvFactor, awayAdvFactor } }
+ * No recursion. Single pass over matchStore.
+ */
+function buildLeagueParams(n) {
+  // Group all matches by league (use sheet name as league proxy)
+  // We derive league from histSheets sheet names
+  const leagueGoals = {}; // { leagueName: { homeGoals, awayGoals, homeGames, awayGames } }
+
+  for (const [sh, rows] of Object.entries(histSheets)) {
+    if (!rows.length) continue;
+    const c = getCols(rows, C_HOME, C_AWAY, C_FTHG, C_FTAG);
+    if (!c || !c.home || !c.away || !c.fthg || !c.ftag) continue;
+    const league = divName(sh);
+    if (!leagueGoals[league]) leagueGoals[league] = { homeGoals:0, awayGoals:0, homeGames:0, awayGames:0 };
+    const lg = leagueGoals[league];
+    for (const r of rows) {
+      const hg = parseFloat(r[c.fthg]), ag = parseFloat(r[c.ftag]);
+      if (isNaN(hg) || isNaN(ag)) continue;
+      lg.homeGoals += hg; lg.awayGoals += ag;
+      lg.homeGames++; lg.awayGames++;
+    }
+  }
+
+  const params = {};
+  for (const [league, lg] of Object.entries(leagueGoals)) {
+    if (!lg.homeGames || !lg.awayGames) continue;
+    const avgHome = lg.homeGoals / lg.homeGames;
+    const avgAway = lg.awayGoals / lg.awayGames;
+    const avgScored = (lg.homeGoals + lg.awayGoals) / (lg.homeGames + lg.awayGames);
+    // homeAdv = ratio of home scoring rate to away scoring rate
+    // Typical Premier League: ~1.20-1.35. Derived from actual data.
+    const homeAdv = avgAway > 0 ? avgHome / avgAway : 1.15;
+    // Distribute symmetrically using sqrt
+    const homeAdvFactor = Math.sqrt(homeAdv);
+    const awayAdvFactor = 1 / homeAdvFactor;
+    params[league] = { avgScored, avgHome, avgAway, homeAdv, homeAdvFactor, awayAdvFactor };
+  }
+  return params;
+}
+
+/**
+ * Build attack and defence ratings for every team.
+ * attackRating  = team_avg_scored   / league_avg_scored
+ * defenceRating = team_avg_conceded / league_avg_conceded  (higher = leakier)
+ * Uses last N matches per team. No recursion.
+ */
+function buildTeamRatings(n, leagueParams, alpha=1.0) {
+  const ratings = {};
+  for (const [teamKey, matches] of Object.entries(matchStore)) {
+    if (!matches.length) continue;
+    const sample = matches.slice(-n);
+    const N = sample.length;
+    const dw = decayWeights(N, alpha);
+    const avgScored   = sample.reduce((s,m,i) => s + m.scored   * dw[i], 0);
+    const avgConceded = sample.reduce((s,m,i) => s + m.conceded * dw[i], 0);
+
+    // Find this team's league from leagueParams — pick the league with most coverage
+    // Fall back to overall average if league unknown
+    const leagueAvg = (() => {
+      // Find canonical name
+      const canon = Object.keys(masterIdx).find(k => k.toLowerCase() === teamKey);
+      if (!canon) return null;
+      // Use league detection via sheet coverage
+      const ct = {};
+      for (const [sh, rows] of Object.entries(histSheets)) {
+        if (!rows.length) continue;
+        const c = getCols(rows, C_HOME, C_AWAY, null, null);
+        if (!c || !c.home || !c.away) continue;
+        let count = 0;
+        for (const r of rows) {
+          const h = String(r[c.home]||'').toLowerCase().trim();
+          const a = String(r[c.away]||'').toLowerCase().trim();
+          if (h === teamKey || a === teamKey) count++;
+        }
+        if (count > 0) ct[divName(sh)] = (ct[divName(sh)]||0) + count;
+      }
+      const topLeague = Object.entries(ct).sort((a,b) => b[1]-a[1])[0];
+      if (!topLeague) return null;
+      return leagueParams[topLeague[0]] || null;
+    })();
+
+    const avgS = leagueAvg ? leagueAvg.avgScored : 1.35;  // fallback to typical avg
+    const attackRating  = avgS > 0 ? avgScored   / avgS : 1.0;
+    const defenceRating = avgS > 0 ? avgConceded / avgS : 1.0;
+
+    ratings[teamKey] = {
+      attackRating:  +attackRating.toFixed(4),
+      defenceRating: +defenceRating.toFixed(4),
+      league: leagueAvg ? Object.entries({}).toString() : 'unknown'
+    };
+  }
+  return ratings;
+}
+
+/**
+ * Compute Dixon-Coles style λ for a fixture using attack/defence ratings.
+ * λ_home = homeAttack × awayDefence × leagueAvg × homeAdvFactor
+ * λ_away = awayAttack × homeDefence × leagueAvg × awayAdvFactor
+ * Falls back to raw average if ratings unavailable.
+ */
+function dcLambda(homeKey, awayKey, league) {
+  const hRating = _teamRatings[homeKey];
+  const aRating = _teamRatings[awayKey];
+  const lp      = _leagueParams[league];
+
+  if (!hRating || !aRating || !lp) return null;
+
+  const avgS = lp.avgScored;
+  const lambdaHome = hRating.attackRating * aRating.defenceRating * avgS * lp.homeAdvFactor;
+  const lambdaAway = aRating.attackRating * hRating.defenceRating * avgS * lp.awayAdvFactor;
+
+  return {
+    lambdaHome: +Math.max(0.1, lambdaHome).toFixed(4),
+    lambdaAway: +Math.max(0.1, lambdaAway).toFixed(4),
+    homeAdvFactor: +lp.homeAdvFactor.toFixed(4),
+    awayAdvFactor: +lp.awayAdvFactor.toFixed(4),
+    leagueAvg:     +avgS.toFixed(4)
+  };
+}
+
+/**
+ * decayWeights(N, alpha) — exponential decay weights for a sample of N games.
+ * Index 0 = oldest game, index N-1 = most recent game.
+ * w(i) = alpha^(N-1-i)   so most recent = 1.0, one back = alpha, two back = alpha^2 …
+ * Returns array of weights already normalised to sum=1.
+ * alpha=1.0 → uniform weights (no recency bias)
+ * alpha=0.85 → moderate recency emphasis
+ * alpha=0.70 → strong recency emphasis
+ */
+function decayWeights(N, alpha) {
+  if (alpha >= 0.999) {
+    // uniform — avoid tiny float drift
+    return Array(N).fill(1/N);
+  }
+  const raw = Array.from({length: N}, (_, i) => Math.pow(alpha, N - 1 - i));
+  const sum = raw.reduce((s,w) => s+w, 0);
+  return raw.map(w => w/sum);
+}
+
+function buildLeagueOSIs(n,alpha=1.0){
   const teams=Object.keys(matchStore);
   return teams.map(k=>{
     const sample=(matchStore[k]||[]).slice(-n);
     if(!sample.length)return 0;
-    const scored  =sample.reduce((s,m)=>s+m.scored,  0)/sample.length;
-    const conceded=sample.reduce((s,m)=>s+m.conceded,0)/sample.length;
+    const N=sample.length;
+    const dw=decayWeights(N,alpha);
+    const scored  =sample.reduce((s,m,i)=>s+m.scored  *dw[i],0);
+    const conceded=sample.reduce((s,m,i)=>s+m.conceded*dw[i],0);
     return scored-conceded;
   });
 }
@@ -1089,19 +1265,23 @@ function osiToMWF(osi,leagueOSIs){
  * λ_adj = Σ(goals_m × MWF_m) / Σ(MWF_m)
  * Opponent stats are ALWAYS raw (no recursion, no chains).
  */
-function adjustedTeamLambda(name,n,leagueOSIs){
+function adjustedTeamLambda(name,n,leagueOSIs,alpha=1.0){
   const all=getTeamMatches(name);
   if(!all.length)return{scored:0,conceded:0,n:0,mwfs:[]};
   const sample=all.slice(-n);
+  const N=sample.length;
+  const dw=decayWeights(N,alpha);
   const mwfs=sample.map(m=>{
-    const osi=computeOSI(m.opponent,n);   // raw, one-stage only
+    const osi=computeOSI(m.opponent,n);
     return osiToMWF(osi,leagueOSIs);
   });
-  const wSum=mwfs.reduce((s,w)=>s+w,0)||1;
+  // Combined weight = OSI weight × decay weight, then normalise
+  const combined=mwfs.map((mwf,i)=>mwf*dw[i]);
+  const wSum=combined.reduce((s,w)=>s+w,0)||1;
   return{
-    scored:  sample.reduce((s,m,i)=>s+m.scored   *mwfs[i],0)/wSum,
-    conceded:sample.reduce((s,m,i)=>s+m.conceded *mwfs[i],0)/wSum,
-    n:sample.length,
+    scored:  sample.reduce((s,m,i)=>s+m.scored   *combined[i],0)/wSum,
+    conceded:sample.reduce((s,m,i)=>s+m.conceded *combined[i],0)/wSum,
+    n:N,
     mwfs
   };
 }
@@ -1196,18 +1376,19 @@ function eloMatchProb(homeKey, awayKey) {
  * Returns: slope, acceleration, momentum, volatility, trend direction.
  * No recursion. Pure linear regression on time series.
  */
-function formTrendStats(name, n) {
+function formTrendStats(name, n, alpha=1.0) {
   const all = getTeamMatches(name);
   if (all.length < 2) return { slope: 0, accel: 0, momentum: 0, volatility: 1, trend: 'neutral', bttsFactor: 0.5 };
   const sample = all.slice(-n);
   const N = sample.length;
+  const dw = decayWeights(N, alpha);
 
   // Performance score per match: goals scored weighted up, conceded weighted down
   const perf = sample.map(m => m.scored - 0.7 * m.conceded);
 
-  // Linear regression: slope = trend direction
+  // Decay-weighted mean for regression
+  const yMean = perf.reduce((s,v,i) => s + v * dw[i], 0);
   const xMean = (N - 1) / 2;
-  const yMean = perf.reduce((s, v) => s + v, 0) / N;
   let num = 0, den = 0;
   for (let i = 0; i < N; i++) {
     num += (i - xMean) * (perf[i] - yMean);
@@ -1223,22 +1404,20 @@ function formTrendStats(name, n) {
   const avgSecond = secondHalf.reduce((s,v)=>s+v,0) / (secondHalf.length||1);
   const accel = avgSecond - avgFirst;
 
-  // Momentum: exponentially weighted recent performance (last 3 matches weight more)
+  // Momentum: last 3 matches (already most recent = highest index)
   const recent = sample.slice(-Math.min(3, N));
   const momentum = recent.reduce((s, m, i) => s + m.scored * (i + 1), 0) /
                    recent.reduce((_, __, i) => _ + (i + 1), 0) || 0;
 
-  // Volatility: standard deviation of perf
-  const variance = perf.reduce((s, v) => s + (v - yMean) ** 2, 0) / N;
+  // Volatility: decay-weighted standard deviation
+  const variance = perf.reduce((s, v, i) => s + dw[i] * (v - yMean) ** 2, 0);
   const volatility = Math.sqrt(variance);
 
-  // Trend label
   const trend = slope > 0.15 ? 'rising' : slope < -0.15 ? 'falling' : 'neutral';
 
-  // BTTS form factor: teams in good form, both scoring → higher BTTS likelihood
-  // Teams in poor form (low scoring) → lower
-  const avgScored   = sample.reduce((s,m)=>s+m.scored,   0)/N;
-  const avgConceded = sample.reduce((s,m)=>s+m.conceded, 0)/N;
+  // BTTS form factor — decay-weighted avg scored/conceded
+  const avgScored   = sample.reduce((s,m,i) => s + m.scored   * dw[i], 0);
+  const avgConceded = sample.reduce((s,m,i) => s + m.conceded * dw[i], 0);
   const bttsFactor = Math.min(0.95, Math.max(0.05,
     0.3 + 0.25 * Math.min(1, avgScored / 2) + 0.25 * Math.min(1, avgConceded / 2) + 0.2 * Math.max(0, slope * 0.3)
   ));
@@ -1404,19 +1583,22 @@ function setEnsMode(m) {
 let osiMode='raw'; // 'raw' | 'adj' | 'both'
 let _leagueOSIs=[];  // populated on each Run
 
-function teamStats(name,n){
+function teamStats(name,n,alpha=1.0){
   const all=getTeamMatches(name);
   if(!all.length)return{name,found:false,rawMatches:[]};
   const sample=all.slice(-n);
   const N=sample.length;
+  const dw=decayWeights(N,alpha); // normalised weights, most recent = highest
 
-  // ── raw λ ──
+  // ── raw λ — decay-weighted ──
+  const lS_raw=sample.reduce((s,m,i)=>s+m.scored  *dw[i],0);
+  const lC_raw=sample.reduce((s,m,i)=>s+m.conceded*dw[i],0);
+  // totS/totC kept as raw counts for display purposes
   const totS=sample.reduce((s,m)=>s+m.scored,0);
   const totC=sample.reduce((s,m)=>s+m.conceded,0);
-  const lS_raw=totS/N, lC_raw=totC/N;
 
-  // ── adjusted λ (one-stage OSI) ──
-  const adjL=adjustedTeamLambda(name,n,_leagueOSIs);
+  // ── adjusted λ (one-stage OSI) with decay ──
+  const adjL=adjustedTeamLambda(name,n,_leagueOSIs,alpha);
   const lS_adj=adjL.scored, lC_adj=adjL.conceded;
 
   // ── pick active λ based on mode ──
@@ -1429,11 +1611,18 @@ function teamStats(name,n){
   const usedStart=all.length-n;
   const raw=all.map((m,i)=>({...m,used:i>=usedStart}));
 
+  // ── attack/defence ratings (DC model) ──
+  const canon=fuzzy(name,masterIdx);
+  const teamKey=canon?canon.toLowerCase():null;
+  const dcRating=teamKey&&_teamRatings[teamKey]?_teamRatings[teamKey]:null;
+
   return{
     name,found:true,N,totS,totC,cs,fts,
     lS:+lS.toFixed(4),   lC:+lC.toFixed(4),
     lS_raw:+lS_raw.toFixed(4), lC_raw:+lC_raw.toFixed(4),
     lS_adj:+lS_adj.toFixed(4), lC_adj:+lC_adj.toFixed(4),
+    attackRating:  dcRating?dcRating.attackRating:null,
+    defenceRating: dcRating?dcRating.defenceRating:null,
     osiMode,
     btts:+btts.toFixed(4),low:N<10,rawMatches:raw
   };
@@ -1450,23 +1639,34 @@ function computeFormScores(results){
 }
 function calcForm(t,mx){return+((Math.min(1,t.lS/mx)*.60+(t.cs/t.N)*.40)*100).toFixed(1);}
 
-function calcFixture(league,home,away,n){
-  const H=teamStats(home,n),A=teamStats(away,n);
-  // Poisson BTTS
-  const mBTTS=(H.found&&A.found)?+((1-Math.exp(-H.lS))*(1-Math.exp(-A.lS))).toFixed(4):null;
+function calcFixture(league,home,away,n,alpha=1.0){
+  const H=teamStats(home,n,alpha),A=teamStats(away,n,alpha);
+
+  // ── Dixon-Coles λ (attack/defence + home advantage) ──
+  const homeKey=fuzzy(home,masterIdx); const awayKey=fuzzy(away,masterIdx);
+  const dcL=(H.found&&A.found&&homeKey&&awayKey)
+    ? dcLambda(homeKey.toLowerCase(), awayKey.toLowerCase(), league)
+    : null;
+
+  // If DC model available, use its λ as the primary scoring rate
+  // otherwise fall back to raw teamStats lS
+  const hLamDC = dcL ? dcL.lambdaHome : (H.found ? H.lS : null);
+  const aLamDC = dcL ? dcL.lambdaAway : (A.found ? A.lS : null);
+
+  // Poisson BTTS — use DC λ when available, otherwise existing lS
+  const mBTTS=(hLamDC!==null&&aLamDC!==null)
+    ?+((1-Math.exp(-hLamDC))*(1-Math.exp(-aLamDC))).toFixed(4):null;
   const mBTTS_raw=(H.found&&A.found)?+((1-Math.exp(-H.lS_raw))*(1-Math.exp(-A.lS_raw))).toFixed(4):null;
   const mBTTS_adj=(H.found&&A.found)?+((1-Math.exp(-H.lS_adj))*(1-Math.exp(-A.lS_adj))).toFixed(4):null;
 
-  // ── Elo model ──
-  const homeKey = fuzzy(home, masterIdx);
-  const awayKey = fuzzy(away, masterIdx);
+  // ── Elo model — reuse homeKey/awayKey from DC lookup above ──
   const eloProbs = (homeKey && awayKey)
     ? eloMatchProb(homeKey.toLowerCase(), awayKey.toLowerCase())
     : null;
 
   // ── Form regression model ──
-  const formH = formTrendStats(home, n);
-  const formA = formTrendStats(away, n);
+  const formH = formTrendStats(home, n, alpha);
+  const formA = formTrendStats(away, n, alpha);
 
   // ── Ensemble fusion ──
   const w   = getWeights();
@@ -1481,8 +1681,9 @@ function calcFixture(league,home,away,n){
   // ── Confidence ──
   const conf = calcConfidence(H, A, mBTTS, ensBTTS, eloProbs, formH, formA, cw);
 
-  // ── Conservative O/U Filter (exact closed-form Poisson, no simulation) ──
-  const lambdaTotal = (H.found && A.found) ? +(H.lS + A.lS).toFixed(4) : null;
+  // ── Conservative O/U Filter — use DC λ when available for better accuracy ──
+  const lambdaTotal = (hLamDC!==null&&aLamDC!==null) ? +(hLamDC + aLamDC).toFixed(4)
+                    : (H.found && A.found) ? +(H.lS + A.lS).toFixed(4) : null;
   const conservOU   = lambdaTotal !== null ? calcConservativeOU(lambdaTotal) : { under15: 0, over35: 0 };
   const conservSig  = conservativeSignal(conservOU.over35, conservOU.under15);
 
@@ -1490,6 +1691,7 @@ function calcFixture(league,home,away,n){
     league, home, away, fixture:`${home} vs ${away}`,
     H, A,
     mBTTS, mBTTS_raw, mBTTS_adj,
+    dcLambdas: dcL,           // { lambdaHome, lambdaAway, homeAdvFactor, leagueAvg } or null
     eloProbs, formH, formA,
     ensBTTS, ensOutcomes,
     conf,
@@ -1583,6 +1785,8 @@ document.getElementById('fileB').addEventListener('change',async e=>{
 
 document.getElementById('nSlider').addEventListener('input',()=>
   document.getElementById('nVal').textContent=document.getElementById('nSlider').value);
+document.getElementById('decaySlider').addEventListener('input',()=>
+  document.getElementById('decayVal').textContent=(parseInt(document.getElementById('decaySlider').value)/100).toFixed(2));
 
 // ── OSI Mode Toggle ──
 function setOsiMode(m){
@@ -1609,12 +1813,18 @@ function log(msg,type=''){
 // ═══════════════════════════════════════════════
 document.getElementById('runBtn').addEventListener('click',async()=>{
   const n=parseInt(document.getElementById('nSlider').value);
+  const alpha=parseInt(document.getElementById('decaySlider').value)/100;
   const btn=document.getElementById('runBtn');
   btn.disabled=true;btn.textContent='Processing…';logBar.innerHTML='';logBar.classList.add('on');
   try{
     // Build league-wide OSI distribution ONCE before processing fixtures
-    _leagueOSIs=buildLeagueOSIs(n);
-    log(`OSI mode: ${osiMode} · league OSI range: [${Math.min(..._leagueOSIs).toFixed(2)}, ${Math.max(..._leagueOSIs).toFixed(2)}]`,'ok');
+    _leagueOSIs=buildLeagueOSIs(n,alpha);
+    log(`OSI mode: ${osiMode} · league OSI range: [${Math.min(..._leagueOSIs).toFixed(2)}, ${Math.max(..._leagueOSIs).toFixed(2)}] · recency α=${alpha.toFixed(2)}`,'ok');
+    // Build attack/defence strength ratings + home advantage per league
+    _leagueParams=buildLeagueParams(n,alpha);
+    _teamRatings=buildTeamRatings(n,_leagueParams,alpha);
+    const lpNames=Object.keys(_leagueParams);
+    log(`Strength model: ${Object.keys(_teamRatings).length} team ratings · ${lpNames.length} league(s) · home adv: ${lpNames.map(l=>l+' ×'+_leagueParams[l].homeAdvFactor.toFixed(3)).join(', ')}`,'ok');
     // Build seasonal Elo ratings from all loaded match data
     _eloRatings=buildEloRatings();
     log(`Elo ratings built · ${_eloRatings.size} teams · top: ${[..._eloRatings.entries()].sort((a,b)=>b[1]-a[1]).slice(0,3).map(([k,v])=>k+':'+Math.round(v)).join(', ')}`,'ok');
@@ -1628,7 +1838,7 @@ document.getElementById('runBtn').addEventListener('click',async()=>{
       for(const r of valid){
         const home=String(r[c.home]).trim(),away=String(r[c.away]).trim();
         const league=detectLeague(home,away,histSheets,masterIdx);
-        const res=calcFixture(league,home,away,n);
+        const res=calcFixture(league,home,away,n,alpha);
         results.push(res);
         log(`  ${res.H.found&&res.A.found?'✓':'⚠'} [${league}] ${home} vs ${away}`);
       }
@@ -1919,6 +2129,29 @@ function ensembleSection(r) {
   const fmBTTS = r.formH && r.formA ? (((r.formH.bttsFactor+r.formA.bttsFactor)/2)*100).toFixed(1)+'%' : '—';
   const ensBTTS= r.ensBTTS !== null ? (r.ensBTTS*100).toFixed(1)+'%' : '—';
 
+  // DC λ display
+  const dcSection = r.dcLambdas ? `
+  <div style="margin-bottom:18px;padding:12px;background:rgba(123,140,255,.06);border:1px solid rgba(123,140,255,.2);border-radius:10px">
+    <div style="font-family:var(--mono);font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:#7b8cff;margin-bottom:10px">⚖ Attack / Defence Model</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      <div style="padding:10px;background:rgba(0,0,0,.25);border-radius:7px;text-align:center">
+        <div style="font-family:var(--mono);font-size:.58rem;color:var(--t3);margin-bottom:4px">Home λ (DC)</div>
+        <div style="font-size:1.1rem;font-weight:700;color:var(--accent)">${r.dcLambdas.lambdaHome.toFixed(3)}</div>
+        <div style="font-family:var(--mono);font-size:.52rem;color:var(--t3)">Atk×${r.H.attackRating?r.H.attackRating.toFixed(2):'—'} · Def×${r.A.defenceRating?r.A.defenceRating.toFixed(2):'—'}</div>
+      </div>
+      <div style="padding:10px;background:rgba(0,0,0,.25);border-radius:7px;text-align:center">
+        <div style="font-family:var(--mono);font-size:.58rem;color:var(--t3);margin-bottom:4px">Away λ (DC)</div>
+        <div style="font-size:1.1rem;font-weight:700;color:var(--a3)">${r.dcLambdas.lambdaAway.toFixed(3)}</div>
+        <div style="font-family:var(--mono);font-size:.52rem;color:var(--t3)">Atk×${r.A.attackRating?r.A.attackRating.toFixed(2):'—'} · Def×${r.H.defenceRating?r.H.defenceRating.toFixed(2):'—'}</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:16px;font-family:var(--mono);font-size:.58rem;color:var(--t3)">
+      <span>League avg: <b style="color:var(--t1)">${r.dcLambdas.leagueAvg.toFixed(2)}</b></span>
+      <span>Home adv: <b style="color:var(--t1)">×${r.dcLambdas.homeAdvFactor.toFixed(3)}</b></span>
+      <span>Away adv: <b style="color:var(--t1)">×${r.dcLambdas.awayAdvFactor.toFixed(3)}</b></span>
+    </div>
+  </div>` : '';
+
   const hWin  = r.eloProbs ? (r.eloProbs.homeWin*100).toFixed(1)+'%' : '—';
   const draw  = r.eloProbs ? (r.eloProbs.draw*100).toFixed(1)+'%' : '—';
   const aWin  = r.eloProbs ? (r.eloProbs.awayWin*100).toFixed(1)+'%' : '—';
@@ -1950,6 +2183,8 @@ function ensembleSection(r) {
     <div style="font-size:.7rem;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px">
       🔀 Ensemble Prediction ${ensMode==='ensemble'?'<span style="color:var(--accent);font-size:.58rem">(ACTIVE)</span>':'<span style="color:var(--t3);font-size:.58rem">(Enable in sidebar)</span>'}
     </div>
+
+    ${dcSection}
 
     <!-- Model cards -->
     <div class="model-grid">
