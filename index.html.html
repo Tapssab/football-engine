@@ -396,6 +396,12 @@ table.ftable tbody tr.hot td:first-child{box-shadow:inset 2px 0 0 var(--accent)}
 .save-btn{width:100%;padding:9px;background:rgba(0,229,160,.08);border:1px solid rgba(0,229,160,.25);border-radius:var(--rs);color:var(--accent);font-family:var(--mono);font-size:.65rem;font-weight:700;letter-spacing:.8px;cursor:pointer;transition:var(--tr)}
 .save-btn:hover{background:rgba(0,229,160,.16);border-color:var(--accent)}
 .save-status{font-family:var(--mono);font-size:.55rem;text-align:center;margin-top:5px;height:14px;transition:opacity .3s}
+/* ── Progress bar ── */
+.progress-wrap{display:none;margin-bottom:10px}
+.progress-wrap.active{display:block}
+.progress-track{height:4px;background:var(--glass);border-radius:2px;overflow:hidden;margin-bottom:5px}
+.progress-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--accent),#00b8ff);border-radius:2px;transition:width .3s ease}
+.progress-label{font-family:var(--mono);font-size:.52rem;color:var(--t2);letter-spacing:.5px;text-align:center}
 </style>
 </head>
 <body>
@@ -593,6 +599,10 @@ table.ftable tbody tr.hot td:first-child{box-shadow:inset 2px 0 0 var(--accent)}
     </div>
 
     <div>
+      <div class="progress-wrap" id="progressWrap">
+        <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+        <div class="progress-label" id="progressLabel">Initialising…</div>
+      </div>
       <button class="run-btn" id="runBtn" disabled>▶ Run Analysis</button>
       <div class="icon-btns">
         <button class="icon-btn" id="csvBtn" disabled>↓ CSV</button>
@@ -1958,40 +1968,79 @@ function log(msg,type=''){
 // ═══════════════════════════════════════════════
 // RUN
 // ═══════════════════════════════════════════════
+function setProgress(pct, label) {
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressLabel').textContent = label;
+}
+
 document.getElementById('runBtn').addEventListener('click',async()=>{
   const n=parseInt(document.getElementById('nSlider').value);
   const alpha=parseInt(document.getElementById('decaySlider').value)/100;
   const btn=document.getElementById('runBtn');
-  btn.disabled=true;btn.textContent='Processing…';logBar.innerHTML='';logBar.classList.add('on');
+  btn.disabled=true;btn.textContent='Running…';logBar.innerHTML='';logBar.classList.add('on');
+
+  // Show progress bar
+  const pw=document.getElementById('progressWrap');
+  pw.classList.add('active');
+  setProgress(0,'Starting…');
+  await new Promise(r=>setTimeout(r,0)); // let DOM paint
+
   try{
-    // Build league-wide OSI distribution ONCE before processing fixtures
+    // Phase 1 — Season filter + OSI
+    setProgress(10,'Building league model…');
+    await new Promise(r=>setTimeout(r,0));
     const totalMatches = Object.values(matchStore).reduce((s,m)=>s+m.length,0);
     log(`Season filter: ${totalMatches} match records from ${SEASON_START.toDateString()} onwards`,'ok');
     _leagueOSIs=buildLeagueOSIs(n,alpha);
     log(`OSI mode: ${osiMode} · league OSI range: [${Math.min(..._leagueOSIs).toFixed(2)}, ${Math.max(..._leagueOSIs).toFixed(2)}] · recency α=${alpha.toFixed(2)}`,'ok');
-    // Build attack/defence strength ratings + home advantage per league
+
+    // Phase 2 — Strength ratings
+    setProgress(25,'Computing attack/defence ratings…');
+    await new Promise(r=>setTimeout(r,0));
     _leagueParams=buildLeagueParams(n,alpha);
     _teamRatings=buildTeamRatings(n,_leagueParams,alpha);
     const lpNames=Object.keys(_leagueParams);
     log(`Strength model: ${Object.keys(_teamRatings).length} team ratings · ${lpNames.length} league(s) · home adv: ${lpNames.map(l=>l+' ×'+_leagueParams[l].homeAdvFactor.toFixed(3)).join(', ')}`,'ok');
-    // Build seasonal Elo ratings from all loaded match data
+
+    // Phase 3 — Elo
+    setProgress(40,'Building Elo ratings…');
+    await new Promise(r=>setTimeout(r,0));
     _eloRatings=buildEloRatings();
     log(`Elo ratings built · ${_eloRatings.size} teams · top: ${[..._eloRatings.entries()].sort((a,b)=>b[1]-a[1]).slice(0,3).map(([k,v])=>k+':'+Math.round(v)).join(', ')}`,'ok');
+
+    // Phase 4 — Fixture analysis (largest phase, track per-fixture)
+    setProgress(55,'Analysing fixtures…');
+    await new Promise(r=>setTimeout(r,0));
     const results=[];
+    const allValid=[];
     for(const[sh,rows]of Object.entries(fixSheets)){
       if(!rows.length)continue;
       const c=getCols(rows,C_HOME,C_AWAY,null,null);
       if(!c||!c.home||!c.away){log(`✗ No home/away cols in "${sh}"`,'err');continue;}
       const valid=rows.filter(r=>{const h=String(r[c.home]||'').trim(),a=String(r[c.away]||'').trim();return h&&h!=='undefined'&&a&&a!=='undefined';});
       log(`"${sh}": ${valid.length} fixture(s)`);
+      allValid.push({sh,rows:valid,c});
+    }
+    const totalFix=allValid.reduce((s,v)=>s+v.rows.length,0);
+    let done=0;
+    for(const{sh,rows:valid,c} of allValid){
       for(const r of valid){
         const home=String(r[c.home]).trim(),away=String(r[c.away]).trim();
         const league=detectLeague(home,away,histSheets,masterIdx);
         const res=calcFixture(league,home,away,n,alpha);
         results.push(res);
         log(`  ${res.H.found&&res.A.found?'✓':'⚠'} [${league}] ${home} vs ${away}`);
+        done++;
+        // Update progress every fixture
+        const pct=55+Math.round((done/totalFix)*35);
+        setProgress(pct,`Analysing ${done} / ${totalFix} fixtures…`);
       }
+      await new Promise(r=>setTimeout(r,0)); // yield per sheet so UI stays responsive
     }
+
+    // Phase 5 — Finalise
+    setProgress(92,'Finalising…');
+    await new Promise(r=>setTimeout(r,0));
     allRows=results;
     computeFormScores(allRows);
     const high=allRows.filter(r=>r.mBTTS!==null&&r.mBTTS>=.7).length;
@@ -2008,7 +2057,16 @@ document.getElementById('runBtn').addEventListener('click',async()=>{
     document.getElementById('jsonBtn').disabled=false;
     document.getElementById('gamesBtn').disabled=false;
     applyFilters();
-  }catch(err){log(`✗ ${err.message}`,'err');console.error(err);}
+
+    setProgress(100,'Complete ✓');
+    setTimeout(()=>{ pw.classList.remove('active'); setProgress(0,''); }, 1200);
+
+  }catch(err){
+    log(`✗ ${err.message}`,'err');
+    console.error(err);
+    setProgress(0,'');
+    pw.classList.remove('active');
+  }
   btn.textContent='▶ Run Analysis';btn.disabled=false;
 });
 
