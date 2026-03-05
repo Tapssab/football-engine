@@ -917,6 +917,7 @@ function saveSettings() {
     cBeta:        document.getElementById('cBeta').value,
     cGamma:       document.getElementById('cGamma').value,
     cDelta:       document.getElementById('cDelta').value,
+    confFilter:   document.getElementById('fConf').value,
     savedAt:      new Date().toLocaleString()
   };
   try {
@@ -960,6 +961,9 @@ function loadSettings() {
     if (s.cBeta  !== undefined) document.getElementById('cBeta').value  = s.cBeta;
     if (s.cGamma !== undefined) document.getElementById('cGamma').value = s.cGamma;
     if (s.cDelta !== undefined) document.getElementById('cDelta').value = s.cDelta;
+
+    // Confidence filter
+    if (s.confFilter !== undefined) document.getElementById('fConf').value = s.confFilter;
 
     // Refresh all weight display labels
     onWeightChange();
