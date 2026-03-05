@@ -396,12 +396,27 @@ table.ftable tbody tr.hot td:first-child{box-shadow:inset 2px 0 0 var(--accent)}
 .save-btn{width:100%;padding:9px;background:rgba(0,229,160,.08);border:1px solid rgba(0,229,160,.25);border-radius:var(--rs);color:var(--accent);font-family:var(--mono);font-size:.65rem;font-weight:700;letter-spacing:.8px;cursor:pointer;transition:var(--tr)}
 .save-btn:hover{background:rgba(0,229,160,.16);border-color:var(--accent)}
 .save-status{font-family:var(--mono);font-size:.55rem;text-align:center;margin-top:5px;height:14px;transition:opacity .3s}
-/* ── Progress bar ── */
+/* ── Sidebar progress bar (small) ── */
 .progress-wrap{display:none;margin-bottom:10px}
 .progress-wrap.active{display:block}
 .progress-track{height:4px;background:var(--glass);border-radius:2px;overflow:hidden;margin-bottom:5px}
 .progress-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--accent),#00b8ff);border-radius:2px;transition:width .3s ease}
 .progress-label{font-family:var(--mono);font-size:.52rem;color:var(--t2);letter-spacing:.5px;text-align:center}
+
+/* ── Full screen loading overlay ── */
+#loadOverlay{
+  display:none;position:absolute;inset:0;z-index:100;
+  background:rgba(8,11,16,.92);backdrop-filter:blur(8px);
+  flex-direction:column;align-items:center;justify-content:center;gap:32px;
+}
+#loadOverlay.active{display:flex;}
+.lo-icon{font-size:2.8rem;animation:lo-pulse 1.4s ease-in-out infinite;}
+@keyframes lo-pulse{0%,100%{transform:scale(1);opacity:.7}50%{transform:scale(1.12);opacity:1}}
+.lo-title{font-family:var(--sans);font-size:1.1rem;font-weight:700;color:var(--t1);letter-spacing:-.3px;}
+.lo-phase{font-family:var(--mono);font-size:.65rem;color:var(--accent);letter-spacing:1.5px;text-transform:uppercase;min-height:18px;text-align:center;}
+.lo-track{width:320px;max-width:80vw;height:6px;background:var(--glass);border-radius:3px;overflow:hidden;}
+.lo-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--accent),#00b8ff);border-radius:3px;transition:width .35s cubic-bezier(.4,0,.2,1);}
+.lo-count{font-family:var(--mono);font-size:.58rem;color:var(--t3);letter-spacing:.5px;}
 </style>
 </head>
 <body>
@@ -619,6 +634,15 @@ table.ftable tbody tr.hot td:first-child{box-shadow:inset 2px 0 0 var(--accent)}
 
   <!-- MAIN -->
   <main class="main" id="mainArea">
+
+    <!-- LOADING OVERLAY -->
+    <div id="loadOverlay">
+      <div class="lo-icon">⚽</div>
+      <div class="lo-title">Running Analysis</div>
+      <div class="lo-phase" id="loPhase">Initialising…</div>
+      <div class="lo-track"><div class="lo-fill" id="loFill"></div></div>
+      <div class="lo-count" id="loCount"></div>
+    </div>
     <div class="empty" id="emptyState">
       <div class="empty-icon">📊</div>
       <div class="empty-title">No Analysis Yet</div>
@@ -1968,9 +1992,14 @@ function log(msg,type=''){
 // ═══════════════════════════════════════════════
 // RUN
 // ═══════════════════════════════════════════════
-function setProgress(pct, label) {
+function setProgress(pct, label, count='') {
+  // Sidebar bar
   document.getElementById('progressFill').style.width = pct + '%';
   document.getElementById('progressLabel').textContent = label;
+  // Full screen overlay
+  document.getElementById('loFill').style.width = pct + '%';
+  document.getElementById('loPhase').textContent = label;
+  document.getElementById('loCount').textContent = count;
 }
 
 document.getElementById('runBtn').addEventListener('click',async()=>{
@@ -1979,9 +2008,11 @@ document.getElementById('runBtn').addEventListener('click',async()=>{
   const btn=document.getElementById('runBtn');
   btn.disabled=true;btn.textContent='Running…';logBar.innerHTML='';logBar.classList.add('on');
 
-  // Show progress bar
+  // Show progress bar + fullscreen overlay
   const pw=document.getElementById('progressWrap');
+  const lo=document.getElementById('loadOverlay');
   pw.classList.add('active');
+  lo.classList.add('active');
   setProgress(0,'Starting…');
   await new Promise(r=>setTimeout(r,0)); // let DOM paint
 
@@ -2033,7 +2064,7 @@ document.getElementById('runBtn').addEventListener('click',async()=>{
         done++;
         // Update progress every fixture
         const pct=55+Math.round((done/totalFix)*35);
-        setProgress(pct,`Analysing ${done} / ${totalFix} fixtures…`);
+        setProgress(pct,`Analysing fixtures…`,`${done} of ${totalFix} complete`);
       }
       await new Promise(r=>setTimeout(r,0)); // yield per sheet so UI stays responsive
     }
@@ -2058,14 +2089,19 @@ document.getElementById('runBtn').addEventListener('click',async()=>{
     document.getElementById('gamesBtn').disabled=false;
     applyFilters();
 
-    setProgress(100,'Complete ✓');
-    setTimeout(()=>{ pw.classList.remove('active'); setProgress(0,''); }, 1200);
+    setProgress(100,'Complete ✓','');
+    setTimeout(()=>{
+      pw.classList.remove('active');
+      lo.classList.remove('active');
+      setProgress(0,'');
+    }, 1200);
 
   }catch(err){
     log(`✗ ${err.message}`,'err');
     console.error(err);
     setProgress(0,'');
     pw.classList.remove('active');
+    lo.classList.remove('active');
   }
   btn.textContent='▶ Run Analysis';btn.disabled=false;
 });
