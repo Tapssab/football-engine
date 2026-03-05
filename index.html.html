@@ -392,6 +392,10 @@ table.ftable tbody tr.hot td:first-child{box-shadow:inset 2px 0 0 var(--accent)}
 .drive-status.ok{display:block;background:rgba(0,229,160,.08);color:var(--accent);border:1px solid rgba(0,229,160,.2)}
 .drive-status.err{display:block;background:rgba(255,77,109,.08);color:var(--a2);border:1px solid rgba(255,77,109,.2)}
 .drive-status.loading{display:block;background:rgba(66,133,244,.08);color:#4285f4;border:1px solid rgba(66,133,244,.2)}
+/* ── Save Settings ── */
+.save-btn{width:100%;padding:9px;background:rgba(0,229,160,.08);border:1px solid rgba(0,229,160,.25);border-radius:var(--rs);color:var(--accent);font-family:var(--mono);font-size:.65rem;font-weight:700;letter-spacing:.8px;cursor:pointer;transition:var(--tr)}
+.save-btn:hover{background:rgba(0,229,160,.16);border-color:var(--accent)}
+.save-status{font-family:var(--mono);font-size:.55rem;text-align:center;margin-top:5px;height:14px;transition:opacity .3s}
 </style>
 </head>
 <body>
@@ -580,6 +584,12 @@ table.ftable tbody tr.hot td:first-child{box-shadow:inset 2px 0 0 var(--accent)}
           Over signal: P(goals &gt; 3.5)<br>Under signal: P(goals &le; 1.0)
         </div>
       </div>
+    </div>
+
+    <div>
+      <div class="sb-hd">Settings</div>
+      <button class="save-btn" id="saveSettingsBtn" onclick="saveSettings()">💾 Save Settings</button>
+      <div class="save-status" id="saveStatus"></div>
     </div>
 
     <div>
@@ -857,6 +867,81 @@ function getGoogleAccessToken() {
 }
 
 // ═══════════════════════════════════════════════
+// SETTINGS — save / load via localStorage
+// ═══════════════════════════════════════════════
+const SETTINGS_KEY = 'footballEngine_settings_v1';
+
+function saveSettings() {
+  const settings = {
+    decayAlpha:   document.getElementById('decaySlider').value,
+    ensMode:      ensMode,
+    osiMode:      osiMode,
+    wPoisson:     document.getElementById('wPoisson').value,
+    wElo:         document.getElementById('wElo').value,
+    wForm:        document.getElementById('wForm').value,
+    cAlpha:       document.getElementById('cAlpha').value,
+    cBeta:        document.getElementById('cBeta').value,
+    cGamma:       document.getElementById('cGamma').value,
+    cDelta:       document.getElementById('cDelta').value,
+    savedAt:      new Date().toLocaleString()
+  };
+  try {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    const el = document.getElementById('saveStatus');
+    el.style.color = 'var(--accent)';
+    el.textContent = '✓ Saved ' + new Date().toLocaleTimeString();
+    setTimeout(() => { el.textContent = ''; }, 3000);
+  } catch(e) {
+    const el = document.getElementById('saveStatus');
+    el.style.color = 'var(--a2)';
+    el.textContent = '✗ Save failed';
+  }
+}
+
+function loadSettings() {
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    if (!raw) return;
+    const s = JSON.parse(raw);
+
+    // Recency α
+    if (s.decayAlpha !== undefined) {
+      document.getElementById('decaySlider').value = s.decayAlpha;
+      document.getElementById('decayVal').textContent = (parseInt(s.decayAlpha)/100).toFixed(2);
+    }
+
+    // Ensemble mode
+    if (s.ensMode) setEnsMode(s.ensMode);
+
+    // Poisson mode
+    if (s.osiMode) setOsiMode(s.osiMode);
+
+    // Ensemble weights
+    if (s.wPoisson !== undefined) document.getElementById('wPoisson').value = s.wPoisson;
+    if (s.wElo     !== undefined) document.getElementById('wElo').value     = s.wElo;
+    if (s.wForm    !== undefined) document.getElementById('wForm').value    = s.wForm;
+
+    // Confidence weights
+    if (s.cAlpha !== undefined) document.getElementById('cAlpha').value = s.cAlpha;
+    if (s.cBeta  !== undefined) document.getElementById('cBeta').value  = s.cBeta;
+    if (s.cGamma !== undefined) document.getElementById('cGamma').value = s.cGamma;
+    if (s.cDelta !== undefined) document.getElementById('cDelta').value = s.cDelta;
+
+    // Refresh all weight display labels
+    onWeightChange();
+
+    const el = document.getElementById('saveStatus');
+    if (el && s.savedAt) {
+      el.style.color = 'var(--t3)';
+      el.textContent = 'Loaded: ' + s.savedAt;
+      setTimeout(() => { el.textContent = ''; }, 4000);
+    }
+  } catch(e) {
+    console.warn('Could not load settings:', e);
+  }
+}
+
+// ═══════════════════════════════════════════════
 // LANDING PAGE — Sport Router
 // ═══════════════════════════════════════════════
 function launchSport(sport) {
@@ -867,6 +952,8 @@ function launchSport(sport) {
   shell.style.opacity = '0';
   shell.style.transition = 'opacity .3s ease';
   requestAnimationFrame(() => { shell.style.opacity = '1'; });
+  // Restore saved settings
+  loadSettings();
 }
 
 function goHome() {
