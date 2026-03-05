@@ -952,8 +952,66 @@ function fuzzy(name,idx){const n=name.toLowerCase().trim();if(idx[n])return idx[
 // ═══════════════════════════════════════════════
 function buildMasterIndex(sheets){
   const idx={};
-  for(const[,rows]of Object.entries(sheets)){if(!rows.length)continue;const c=getCols(rows,C_HOME,C_AWAY,null,null);if(!c||(!c.home&&!c.away))continue;for(const r of rows){const h=c.home?String(r[c.home]||'').trim():'';const a=c.away?String(r[c.away]||'').trim():'';if(h&&h!=='undefined')idx[h.toLowerCase()]=h;if(a&&a!=='undefined')idx[a.toLowerCase()]=a;}}
+  for(const[,rows]of Object.entries(sheets)){
+    if(!rows.length)continue;
+    const c=getCols(rows,C_HOME,C_AWAY,null,null);
+    if(!c||(!c.home&&!c.away))continue;
+    const dateCol=findCol(rows[0],C_DATE);
+    for(const r of rows){
+      // Only index teams from current season
+      const dt=dateCol?String(r[dateCol]||'').trim():'';
+      if(dt && !isCurrentSeason(dt)) continue;
+      const h=c.home?String(r[c.home]||'').trim():'';
+      const a=c.away?String(r[c.away]||'').trim():'';
+      if(h&&h!=='undefined')idx[h.toLowerCase()]=h;
+      if(a&&a!=='undefined')idx[a.toLowerCase()]=a;
+    }
+  }
   return idx;
+}
+
+// ═══════════════════════════════════════════════
+// SEASON CUTOFF
+// Only matches on or after this date are used.
+// Updated each season (currently 2025/26).
+// ═══════════════════════════════════════════════
+const SEASON_START = new Date('2025-07-01'); // 1 July 2025 — covers all 2025/26 leagues
+
+/**
+ * Parse a date string from football-data.co.uk files.
+ * Common formats: DD/MM/YY, DD/MM/YYYY, YYYY-MM-DD, MM/DD/YYYY
+ * Returns a Date object or null if unparseable.
+ */
+function parseMatchDate(str) {
+  if (!str || !str.trim()) return null;
+  const s = str.trim();
+
+  // DD/MM/YY or DD/MM/YYYY (most common in football-data.co.uk)
+  let m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if (m) {
+    let [, d, mo, y] = m;
+    if (y.length === 2) y = parseInt(y) < 50 ? '20' + y : '19' + y;
+    return new Date(`${y}-${mo.padStart(2,'0')}-${d.padStart(2,'0')}`);
+  }
+
+  // YYYY-MM-DD
+  m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (m) return new Date(s);
+
+  // MM/DD/YYYY
+  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (m) {
+    const [, mo, d, y] = m;
+    return new Date(`${y}-${mo.padStart(2,'0')}-${d.padStart(2,'0')}`);
+  }
+
+  return null;
+}
+
+function isCurrentSeason(dateStr) {
+  const d = parseMatchDate(dateStr);
+  if (!d || isNaN(d.getTime())) return false;
+  return d >= SEASON_START;
 }
 
 function buildMatchStore(sheets,idx){
@@ -969,6 +1027,8 @@ function buildMatchStore(sheets,idx){
       if(!hR||!aR||isNaN(hg)||isNaN(ag))continue;
       const hC=fuzzy(hR,idx),aC=fuzzy(aR,idx);
       const dt=c.date?String(r[c.date]||'').trim():'';
+      // Current season filter — skip matches before SEASON_START
+      if (dt && !isCurrentSeason(dt)) continue;
       if(hC){const k=hC.toLowerCase();en(k);store[k].push({scored:hg,conceded:ag,date:dt,opponent:aC||aR,venue:'H',hg,ag});}
       if(aC){const k=aC.toLowerCase();en(k);store[k].push({scored:ag,conceded:hg,date:dt,opponent:hC||hR,venue:'A',hg,ag});}
     }
@@ -1095,10 +1155,8 @@ let _teamRatings  = {};      // populated on each Run, keyed by team canonical n
  * Returns object: { [leagueName]: { avgScored, homeAdv, homeAdvFactor, awayAdvFactor } }
  * No recursion. Single pass over matchStore.
  */
-function buildLeagueParams(n) {
-  // Group all matches by league (use sheet name as league proxy)
-  // We derive league from histSheets sheet names
-  const leagueGoals = {}; // { leagueName: { homeGoals, awayGoals, homeGames, awayGames } }
+function buildLeagueParams(n, alpha=1.0) {
+  const leagueGoals = {};
 
   for (const [sh, rows] of Object.entries(histSheets)) {
     if (!rows.length) continue;
@@ -1108,6 +1166,8 @@ function buildLeagueParams(n) {
     if (!leagueGoals[league]) leagueGoals[league] = { homeGoals:0, awayGoals:0, homeGames:0, awayGames:0 };
     const lg = leagueGoals[league];
     for (const r of rows) {
+      const dt = c.date ? String(r[c.date]||'').trim() : '';
+      if (dt && !isCurrentSeason(dt)) continue; // current season only
       const hg = parseFloat(r[c.fthg]), ag = parseFloat(r[c.ftag]);
       if (isNaN(hg) || isNaN(ag)) continue;
       lg.homeGoals += hg; lg.awayGoals += ag;
@@ -1818,6 +1878,8 @@ document.getElementById('runBtn').addEventListener('click',async()=>{
   btn.disabled=true;btn.textContent='Processing…';logBar.innerHTML='';logBar.classList.add('on');
   try{
     // Build league-wide OSI distribution ONCE before processing fixtures
+    const totalMatches = Object.values(matchStore).reduce((s,m)=>s+m.length,0);
+    log(`Season filter: ${totalMatches} match records from ${SEASON_START.toDateString()} onwards`,'ok');
     _leagueOSIs=buildLeagueOSIs(n,alpha);
     log(`OSI mode: ${osiMode} · league OSI range: [${Math.min(..._leagueOSIs).toFixed(2)}, ${Math.max(..._leagueOSIs).toFixed(2)}] · recency α=${alpha.toFixed(2)}`,'ok');
     // Build attack/defence strength ratings + home advantage per league
