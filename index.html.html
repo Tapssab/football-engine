@@ -2083,13 +2083,14 @@ document.getElementById('runBtn').addEventListener('click',async()=>{
     document.getElementById('ts-fix').textContent=allRows.length;
     document.getElementById('ts-high').textContent=high;
     document.getElementById('ts-mode').textContent=(ensMode==='ensemble'?'ENSEMBLE':'POISSON')+' / '+osiMode.toUpperCase();
-    // Latest date across all loaded match data
+    // Latest date across all loaded match data — capped at today
+    const today = new Date();
     let latestDate = null;
     for (const matches of Object.values(matchStore)) {
       for (const m of matches) {
         if (!m.date) continue;
         const d = parseMatchDate(m.date);
-        if (d && !isNaN(d) && (!latestDate || d > latestDate)) latestDate = d;
+        if (d && !isNaN(d) && d <= today && (!latestDate || d > latestDate)) latestDate = d;
       }
     }
     document.getElementById('ts-date').textContent = latestDate
