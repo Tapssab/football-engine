@@ -489,6 +489,7 @@ table.ftable tbody tr.hot td:first-child{box-shadow:inset 2px 0 0 var(--accent)}
     <div class="tb-stat">Teams: <b id="ts-teams">0</b></div>
     <div class="tb-stat">BTTS &gt;70%: <b id="ts-high">0</b></div>
     <div class="tb-stat">Files: <b id="ts-files">0</b></div>
+    <div class="tb-stat">Latest Data: <b id="ts-date" style="color:var(--accent)">—</b></div>
     <div class="tb-stat">Model: <b id="ts-mode" style="color:var(--accent)">RAW</b></div>
   </div>
 </div>
@@ -2082,6 +2083,18 @@ document.getElementById('runBtn').addEventListener('click',async()=>{
     document.getElementById('ts-fix').textContent=allRows.length;
     document.getElementById('ts-high').textContent=high;
     document.getElementById('ts-mode').textContent=(ensMode==='ensemble'?'ENSEMBLE':'POISSON')+' / '+osiMode.toUpperCase();
+    // Latest date across all loaded match data
+    let latestDate = null;
+    for (const matches of Object.values(matchStore)) {
+      for (const m of matches) {
+        if (!m.date) continue;
+        const d = parseMatchDate(m.date);
+        if (d && !isNaN(d) && (!latestDate || d > latestDate)) latestDate = d;
+      }
+    }
+    document.getElementById('ts-date').textContent = latestDate
+      ? latestDate.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})
+      : '—';
     document.getElementById('topStats').style.display='flex';
     log(`✓ Done — ${allRows.length} fixture(s)`,'ok');
     fillLeagueSelect(allRows);
