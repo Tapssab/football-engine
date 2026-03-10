@@ -2620,12 +2620,118 @@ function ensembleSection(r) {
   const ensOutD  = r.ensOutcomes ? (r.ensOutcomes.draw*100).toFixed(1)+'%' : draw;
   const ensOutA  = r.ensOutcomes ? (r.ensOutcomes.aw*100).toFixed(1)+'%' : aWin;
 
+  // ── Debug section ──
+  const na = v => (v !== null && v !== undefined) ? v : '—';
+  const pct = v => (v !== null && v !== undefined) ? (v*100).toFixed(2)+'%' : '—';
+  const fix4 = v => (v !== null && v !== undefined) ? (+v).toFixed(4) : '—';
+
+  const hLam  = r.dcLambdas ? r.dcLambdas.lambdaHome : r.H.lS;
+  const aLam  = r.dcLambdas ? r.dcLambdas.lambdaAway : r.A.lS;
+  const hBTTS_component = hLam !== null ? (1 - Math.exp(-hLam)) : null;
+  const aBTTS_component = aLam !== null ? (1 - Math.exp(-aLam)) : null;
+  const btts_check = (hBTTS_component !== null && aBTTS_component !== null)
+    ? (hBTTS_component * aBTTS_component) : null;
+
+  const hLeague = r.H.found && _teamRatings[fuzzy(r.home,masterIdx)?.toLowerCase()]
+    ? _teamRatings[fuzzy(r.home,masterIdx).toLowerCase()].league : '—';
+  const aLeague = r.A.found && _teamRatings[fuzzy(r.away,masterIdx)?.toLowerCase()]
+    ? _teamRatings[fuzzy(r.away,masterIdx).toLowerCase()].league : '—';
+
+  const debugSection = `
+  <details style="margin-bottom:16px">
+    <summary style="cursor:pointer;font-family:var(--mono);font-size:.58rem;letter-spacing:1.5px;text-transform:uppercase;color:#ff8a80;padding:10px 12px;background:rgba(255,138,128,.06);border:1px solid rgba(255,138,128,.2);border-radius:8px;list-style:none;display:flex;align-items:center;gap:6px">
+      🔬 Debug — Raw Calculation Trace
+      <span style="margin-left:auto;font-size:.55rem;color:var(--t3)">(click to expand)</span>
+    </summary>
+    <div style="padding:12px;background:rgba(0,0,0,.3);border:1px solid rgba(255,138,128,.15);border-top:none;border-radius:0 0 8px 8px;font-family:var(--mono);font-size:.58rem;line-height:1.9">
+
+      <div style="color:#ffd166;margin-bottom:8px;font-size:.6rem">── DATA INPUTS ──</div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+        <div style="padding:8px;background:rgba(0,0,0,.2);border-radius:6px">
+          <div style="color:var(--accent);margin-bottom:4px">${r.home}</div>
+          <div>Matched in data: <b style="color:${r.H.found?'var(--accent)':'var(--a2)'}">${r.H.found ? 'YES' : 'NO'}</b></div>
+          <div>Games used (n): <b style="color:var(--t1)">${na(r.H.N)}</b></div>
+          <div>Goals scored (total): <b style="color:var(--t1)">${na(r.H.totS)}</b></div>
+          <div>Goals conceded (total): <b style="color:var(--t1)">${na(r.H.totC)}</b></div>
+          <div>Raw λ scored: <b style="color:var(--t1)">${fix4(r.H.lS_raw)}</b></div>
+          <div>Raw λ conceded: <b style="color:var(--t1)">${fix4(r.H.lC_raw)}</b></div>
+          <div>OSI-adj λ scored: <b style="color:var(--t1)">${fix4(r.H.lS_adj)}</b></div>
+          <div>Active λ (${r.H.osiMode}): <b style="color:#ffd166">${fix4(r.H.lS)}</b></div>
+          <div>Attack rating: <b style="color:var(--t1)">${fix4(r.H.attackRating)}</b></div>
+          <div>Defence rating: <b style="color:var(--t1)">${fix4(r.H.defenceRating)}</b></div>
+          <div>Domestic league: <b style="color:var(--t1)">${hLeague}</b></div>
+          <div>Clean sheets: <b style="color:var(--t1)">${na(r.H.cs)} / ${na(r.H.N)}</b></div>
+          <div>Failed to score: <b style="color:var(--t1)">${na(r.H.fts)} / ${na(r.H.N)}</b></div>
+        </div>
+        <div style="padding:8px;background:rgba(0,0,0,.2);border-radius:6px">
+          <div style="color:#ffd166;margin-bottom:4px">${r.away}</div>
+          <div>Matched in data: <b style="color:${r.A.found?'var(--accent)':'var(--a2)'}">${r.A.found ? 'YES' : 'NO'}</b></div>
+          <div>Games used (n): <b style="color:var(--t1)">${na(r.A.N)}</b></div>
+          <div>Goals scored (total): <b style="color:var(--t1)">${na(r.A.totS)}</b></div>
+          <div>Goals conceded (total): <b style="color:var(--t1)">${na(r.A.totC)}</b></div>
+          <div>Raw λ scored: <b style="color:var(--t1)">${fix4(r.A.lS_raw)}</b></div>
+          <div>Raw λ conceded: <b style="color:var(--t1)">${fix4(r.A.lC_raw)}</b></div>
+          <div>OSI-adj λ scored: <b style="color:var(--t1)">${fix4(r.A.lS_adj)}</b></div>
+          <div>Active λ (${r.A.osiMode}): <b style="color:#ffd166">${fix4(r.A.lS)}</b></div>
+          <div>Attack rating: <b style="color:var(--t1)">${fix4(r.A.attackRating)}</b></div>
+          <div>Defence rating: <b style="color:var(--t1)">${fix4(r.A.defenceRating)}</b></div>
+          <div>Domestic league: <b style="color:var(--t1)">${aLeague}</b></div>
+          <div>Clean sheets: <b style="color:var(--t1)">${na(r.A.cs)} / ${na(r.A.N)}</b></div>
+          <div>Failed to score: <b style="color:var(--t1)">${na(r.A.fts)} / ${na(r.A.N)}</b></div>
+        </div>
+      </div>
+
+      <div style="color:#ffd166;margin-bottom:8px;font-size:.6rem">── LEAGUE CONTEXT ──</div>
+      <div style="padding:8px;background:rgba(0,0,0,.2);border-radius:6px;margin-bottom:12px">
+        <div>League passed in: <b style="color:var(--t1)">${r.league}</b></div>
+        ${r.dcLambdas ? `
+        <div>DC league avg goals/game: <b style="color:var(--t1)">${fix4(r.dcLambdas.leagueAvg)}</b></div>
+        <div>Home advantage factor: <b style="color:var(--t1)">×${fix4(r.dcLambdas.homeAdvFactor)}</b></div>
+        <div>Away advantage factor: <b style="color:var(--t1)">×${fix4(r.dcLambdas.awayAdvFactor)}</b></div>
+        <div>Source: <b style="color:var(--accent)">Dixon-Coles model active</b></div>
+        ` : `<div>Source: <b style="color:#ffd166">DC model unavailable — using raw λ fallback</b></div>`}
+      </div>
+
+      <div style="color:#ffd166;margin-bottom:8px;font-size:.6rem">── BTTS FORMULA TRACE ──</div>
+      <div style="padding:8px;background:rgba(0,0,0,.2);border-radius:6px;margin-bottom:12px">
+        <div style="color:var(--t2);margin-bottom:6px">Formula: BTTS = (1 − e<sup>−λH</sup>) × (1 − e<sup>−λA</sup>)</div>
+        <div>λ Home used: <b style="color:#ffd166">${fix4(hLam)}</b> ${r.dcLambdas ? '(DC)' : '(raw)'}</div>
+        <div>λ Away used: <b style="color:#ffd166">${fix4(aLam)}</b> ${r.dcLambdas ? '(DC)' : '(raw)'}</div>
+        <div>P(Home scores) = 1 − e<sup>−${fix4(hLam)}</sup> = <b style="color:var(--accent)">${hBTTS_component !== null ? hBTTS_component.toFixed(4) : '—'}</b></div>
+        <div>P(Away scores) = 1 − e<sup>−${fix4(aLam)}</sup> = <b style="color:var(--accent)">${aBTTS_component !== null ? aBTTS_component.toFixed(4) : '—'}</b></div>
+        <div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,.08)">
+          BTTS check = ${hBTTS_component !== null ? hBTTS_component.toFixed(4) : '—'} × ${aBTTS_component !== null ? aBTTS_component.toFixed(4) : '—'} = 
+          <b style="color:${btts_check !== null && Math.abs(btts_check - (r.mBTTS||0)) < 0.001 ? 'var(--accent)' : '#ffd166'}">
+            ${btts_check !== null ? (btts_check*100).toFixed(2)+'%' : '—'}
+          </b>
+        </div>
+        <div>Stored mBTTS (Poisson): <b style="color:var(--t1)">${pct(r.mBTTS)}</b></div>
+        <div>Final Ensemble BTTS: <b style="color:var(--accent)">${pct(r.ensBTTS)}</b></div>
+        ${btts_check !== null && r.mBTTS !== null && Math.abs(btts_check - r.mBTTS) > 0.001
+          ? `<div style="color:#ff4d6d;margin-top:6px">⚠ MISMATCH — recalculated BTTS differs from stored value by ${Math.abs(btts_check - r.mBTTS).toFixed(4)}</div>`
+          : `<div style="color:var(--accent);margin-top:6px">✓ BTTS check matches stored value</div>`
+        }
+      </div>
+
+      <div style="color:#ffd166;margin-bottom:8px;font-size:.6rem">── ELO ──</div>
+      <div style="padding:8px;background:rgba(0,0,0,.2);border-radius:6px">
+        <div>Home Elo: <b style="color:var(--t1)">${r.eloProbs ? r.eloProbs.homeElo : '—'}</b></div>
+        <div>Away Elo: <b style="color:var(--t1)">${r.eloProbs ? r.eloProbs.awayElo : '—'}</b></div>
+        <div>Elo diff: <b style="color:var(--t1)">${r.eloProbs ? r.eloProbs.eloDiff : '—'}</b></div>
+        <div>Elo BTTS: <b style="color:var(--t1)">${pct(r.eloProbs ? r.eloProbs.btts : null)}</b></div>
+      </div>
+
+    </div>
+  </details>`;
+
   return `<div style="border-bottom:1px solid var(--gb);padding-bottom:16px;margin-bottom:16px">
     <div style="font-size:.7rem;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px">
       🔀 Ensemble Prediction ${ensMode==='ensemble'?'<span style="color:var(--accent);font-size:.58rem">(ACTIVE)</span>':'<span style="color:var(--t3);font-size:.58rem">(Enable in sidebar)</span>'}
     </div>
 
     ${dcSection}
+    ${debugSection}
 
     <!-- Model cards -->
     <div class="model-grid">
