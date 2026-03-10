@@ -1152,14 +1152,49 @@ const KNOWN_LEAGUES = new Set([
 function findCol(s,als){const ks=Object.keys(s);for(const a of als){const n=a.toLowerCase().replace(/[\s_-]/g,'');const f=ks.find(k=>k.toLowerCase().replace(/[\s_-]/g,'')=== n);if(f)return f;}return null;}
 function getCols(rows,hA,aA,fA,gA){if(!rows.length)return null;const s=rows[0];return{home:findCol(s,hA),away:findCol(s,aA),fthg:fA?findCol(s,fA):null,ftag:gA?findCol(s,gA):null,date:findCol(s,C_DATE),league:findCol(s,C_LEAGUE)};}
 
-// Exact match only — checks dynamic set built from loaded files, plus common aliases
+// Cross-competition tournaments — teams come from different domestic leagues.
+// These are allowed through the whitelist; the engine blends each team's own league params.
+const CROSS_COMPETITIONS = new Set([
+  // UEFA
+  'uefa champions league','champions league','ucl',
+  'uefa europa league','europa league','uel',
+  'uefa conference league','conference league','uecl',
+  'uefa nations league','nations league',
+  'uefa super cup',
+  // Domestic cups
+  'fa cup','english fa cup','carabao cup','efl cup','league cup',
+  'copa del rey','spain cup','coupe de france','france cup',
+  'dfb pokal','german cup','coppa italia','italy cup',
+  'coupe de la ligue','trophee des champions',
+  'fa community shield','community shield',
+  'scottish cup','scottish league cup',
+  'dutch cup','knvb cup','belgian cup',
+  'portuguese cup','taca de portugal',
+  'turkish cup','turkey cup',
+  'greek cup',
+  // Other international
+  'world cup','world cup qualifiers','wc qualifiers',
+  'euro','euros','european championship','euro qualifiers',
+  'africa cup of nations','afcon',
+  'copa america',
+  'concacaf gold cup',
+  'afc champions league','afc cup',
+  'club world cup','fifa club world cup',
+]);
+
+// Exact match only — checks dynamic set, static aliases, and cross-competition whitelist
 function isKnownLeague(val){
   if(!val) return false;
   const v = val.toString().toLowerCase().trim();
-  // Check against leagues actually present in the loaded historical files
   if(_knownLeagues.has(v)) return true;
-  // Also check against static aliases (e.g. "england championship" → "championship")
-  return KNOWN_LEAGUES.has(v);
+  if(KNOWN_LEAGUES.has(v)) return true;
+  if(CROSS_COMPETITIONS.has(v)) return true;
+  return false;
+}
+
+function isCrossCompetition(val){
+  if(!val) return false;
+  return CROSS_COMPETITIONS.has(val.toString().toLowerCase().trim());
 }
 
 // ═══════════════════════════════════════════════
@@ -1461,18 +1496,18 @@ function buildTeamRatings(n, leagueParams, alpha=1.0) {
         if (count > 0) ct[divName(sh)] = (ct[divName(sh)]||0) + count;
       }
       const topLeague = Object.entries(ct).sort((a,b) => b[1]-a[1])[0];
-      if (!topLeague) return null;
-      return leagueParams[topLeague[0]] || null;
+      if (!topLeague) return { lp: null, name: null };
+      return { lp: leagueParams[topLeague[0]] || null, name: topLeague[0] };
     })();
 
-    const avgS = leagueAvg ? leagueAvg.avgScored : 1.35;  // fallback to typical avg
+    const avgS = leagueAvg.lp ? leagueAvg.lp.avgScored : 1.35;  // fallback to typical avg
     const attackRating  = avgS > 0 ? avgScored   / avgS : 1.0;
     const defenceRating = avgS > 0 ? avgConceded / avgS : 1.0;
 
     ratings[teamKey] = {
       attackRating:  +attackRating.toFixed(4),
       defenceRating: +defenceRating.toFixed(4),
-      league: leagueAvg ? Object.entries({}).toString() : 'unknown'
+      league: leagueAvg.name || 'unknown'
     };
   }
   return ratings;
@@ -1487,7 +1522,28 @@ function buildTeamRatings(n, leagueParams, alpha=1.0) {
 function dcLambda(homeKey, awayKey, league) {
   const hRating = _teamRatings[homeKey];
   const aRating = _teamRatings[awayKey];
-  const lp      = _leagueParams[league];
+  let lp = _leagueParams[league];
+
+  // For cross-competition fixtures (cups, European) there's no shared league param.
+  // Blend each team's own domestic league params instead.
+  if (!lp && (isCrossCompetition(league) || !_leagueParams[league])) {
+    const hLeague = hRating ? hRating.league : null;
+    const aLeague = aRating ? aRating.league : null;
+    const hLP = hLeague ? _leagueParams[hLeague] : null;
+    const aLP = aLeague ? _leagueParams[aLeague] : null;
+    if (hLP && aLP) {
+      // Average the two league contexts
+      lp = {
+        avgScored:     (hLP.avgScored + aLP.avgScored) / 2,
+        homeAdvFactor: (hLP.homeAdvFactor + aLP.homeAdvFactor) / 2,
+        awayAdvFactor: (hLP.awayAdvFactor + aLP.awayAdvFactor) / 2,
+      };
+    } else if (hLP) {
+      lp = hLP;
+    } else if (aLP) {
+      lp = aLP;
+    }
+  }
 
   if (!hRating || !aRating || !lp) return null;
 
