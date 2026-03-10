@@ -1053,6 +1053,7 @@ function resetApp() {
 // ═══════════════════════════════════════════════
 let histSheets = {}, fixSheets = null;
 let masterIdx = {}, matchStore = {};
+let _knownLeagues = new Set(); // built dynamically from loaded historical files
 let allRows = [], visRows = [], loadedFiles = [];
 
 // ═══════════════════════════════════════════════
@@ -1070,61 +1071,95 @@ const divName=s=>DIV[s]||s;
 // All leagues covered by the 4 football-data.co.uk source files
 // Fixtures must include a League column matching one of these (fuzzy)
 const KNOWN_LEAGUES = new Set([
-  // England
-  'premier league','championship','league one','league two','national league',
-  'e0','e1','e2','e3','ec',
-  // Scotland
-  'scottish prem','scottish premiership','scottish championship','scottish champ',
-  'scottish league one','scottish l1','scottish league two','scottish l2',
-  'sc0','sc1','sc2','sc3',
-  // Germany
-  'bundesliga','bundesliga 2','bundesliga 1','bundesliga2','2. bundesliga',
-  'd1','d2',
-  // Spain
-  'la liga','la liga 2','laliga','segunda division','sp1','sp2',
-  // Italy
-  'serie a','serie b','i1','i2',
-  // France
-  'ligue 1','ligue 2','f1','f2',
-  // Netherlands
-  'eredivisie','n1',
-  // Belgium
-  'belgian pro league','belgian pro','jupiler pro league','b1',
-  // Portugal
-  'primeira liga','liga portugal','p1',
-  // Turkey
-  'süper lig','super lig','t1',
-  // Greece
-  'super league gr','super league','g1',
-  // New leagues (new_leagues_data.xlsx + Latest_Results_New.xlsx)
-  'argentina','primera division argentina','copa de la liga',
-  'austria','austrian bundesliga','bundesliga austria',
-  'brazil','brasileirao','serie a brazil','campeonato brasileiro',
-  'china','chinese super league','csl',
-  'denmark','superliga','danish superliga',
-  'finland','veikkausliiga','finnish premier',
-  'ireland','league of ireland','loi premier division',
-  'japan','j1 league','j.league','j league',
-  'mexico','liga mx','primera division mexico',
-  'norway','eliteserien','norwegian eliteserien',
-  'poland','ekstraklasa','polish ekstraklasa',
-  'romania','liga 1','romanian liga 1',
-  'russia','russian premier league','rpl',
-  'sweden','allsvenskan','swedish allsvenskan',
-  'switzerland','super league switzerland','swiss super league',
-  'usa','mls','major league soccer',
+  // E0 — English Premier League
+  'e0', 'english premier league', 'epl', 'premier league', 'england pl',
+  // E1 — Championship
+  'e1', 'english football league championship', 'championship', 'efl championship', 'england d2', 'england championship',
+  // E2 — League One
+  'e2', 'english football league one', 'league one', 'england d3', 'england league one',
+  // E3 — League Two
+  'e3', 'english football league two', 'league two', 'england d4', 'england league two',
+  // EC — FA Cup
+  'ec', 'english fa cup', 'fa cup', 'england cup',
+  // SC0 — Scottish Premiership
+  'sc0', 'scottish premiership', 'spfl premiership', 'scotland d1',
+  // SC1 — Scottish Championship
+  'sc1', 'scottish championship', 'scottish champ', 'scotland d2', 'scotland championship',
+  // SC2 — Scottish League One
+  'sc2', 'scottish league one', 'league one scotland', 'scotland d3', 'scotland league one',
+  // SC3 — Scottish League Two
+  'sc3', 'scottish league two', 'league two scotland', 'scotland d4', 'scotland league two',
+  // D1 — Bundesliga
+  'd1', 'bundesliga', 'germany d1',
+  // D2 — 2. Bundesliga
+  'd2', '2. bundesliga', 'bundesliga 2', 'germany d2',
+  // SP1 — La Liga
+  'sp1', 'la liga', 'primera división', 'primera division',
+  // SP2 — Segunda División
+  'sp2', 'segunda división', 'segunda division', 'laliga2', 'spain d2',
+  // I1 — Serie A
+  'i1', 'serie a', 'italy d1',
+  // I2 — Serie B
+  'i2', 'serie b', 'italy d2',
+  // F1 — Ligue 1
+  'f1', 'ligue 1', 'france d1',
+  // F2 — Ligue 2
+  'f2', 'ligue 2', 'france d2',
+  // B1 — Belgian Pro League
+  'b1', 'belgian pro league', 'jupiler pro league', 'belgium d1',
+  // N1 — Eredivisie
+  'n1', 'eredivisie', 'netherlands d1',
+  // P1 — Primeira Liga
+  'p1', 'primeira liga', 'liga portugal', 'portugal d1',
+  // T1 — Süper Lig
+  't1', 'süper lig', 'super lig', 'turkey d1', 'turkey tff 1. lig', 'tff 1. lig', 'turkey tff first league',
+  // G1 — Super League Greece
+  'g1', 'super league greece', 'greek super league', 'greece d1',
+  // ARG — Argentine Primera División
+  'arg', 'argentine primera división', 'argentine primera division', 'liga profesional', 'argentina lpf',
+  // AUT — Austrian Bundesliga
+  'aut', 'austrian bundesliga', 'austrian bl', 'austria d1',
+  // BRA — Brasileirao
+  'bra', 'campeonato brasileiro série a', 'campeonato brasileiro serie a', 'brasileirao', 'brazil serie a',
+  // CHN — Chinese Super League
+  'chn', 'chinese super league', 'csl', 'china super league',
+  // DNK — Danish Superliga
+  'dnk', 'danish superliga', 'superliga', 'denmark d1',
+  // FIN — Veikkausliiga
+  'fin', 'veikkausliiga', 'finland d1',
+  // IRL — League of Ireland
+  'irl', 'league of ireland premier division', 'loi premier', 'ireland d1',
+  // JPN — J1 League
+  'jpn', 'j1 league', 'j-league', 'japan j1',
+  // MEX — Liga MX
+  'mex', 'liga mx', 'mexico primera',
+  // NOR — Eliteserien
+  'nor', 'eliteserien', 'norway d1',
+  // POL — Ekstraklasa
+  'pol', 'ekstraklasa', 'poland d1',
+  // ROU — Liga I
+  'rou', 'liga i', 'romanian liga i', 'romania d1',
+  // RUS — Russian Premier League
+  'rus', 'russian premier league', 'rpl', 'russia d1',
+  // SWE — Allsvenskan
+  'swe', 'allsvenskan', 'sweden d1',
+  // SWZ — Swiss Super League
+  'swz', 'swiss super league', 'super league', 'switzerland d1',
+  // USA — MLS
+  'usa', 'major league soccer', 'mls', 'usa mls',
 ]);
 
 function findCol(s,als){const ks=Object.keys(s);for(const a of als){const n=a.toLowerCase().replace(/[\s_-]/g,'');const f=ks.find(k=>k.toLowerCase().replace(/[\s_-]/g,'')=== n);if(f)return f;}return null;}
 function getCols(rows,hA,aA,fA,gA){if(!rows.length)return null;const s=rows[0];return{home:findCol(s,hA),away:findCol(s,aA),fthg:fA?findCol(s,fA):null,ftag:gA?findCol(s,gA):null,date:findCol(s,C_DATE),league:findCol(s,C_LEAGUE)};}
 
+// Exact match only — checks dynamic set built from loaded files, plus common aliases
 function isKnownLeague(val){
   if(!val) return false;
   const v = val.toString().toLowerCase().trim();
-  if(KNOWN_LEAGUES.has(v)) return true;
-  // also accept if it contains a known league name
-  for(const k of KNOWN_LEAGUES){ if(v.includes(k)||k.includes(v)) return true; }
-  return false;
+  // Check against leagues actually present in the loaded historical files
+  if(_knownLeagues.has(v)) return true;
+  // Also check against static aliases (e.g. "england championship" → "championship")
+  return KNOWN_LEAGUES.has(v);
 }
 
 // ═══════════════════════════════════════════════
@@ -1143,7 +1178,13 @@ function fuzzy(name,idx){const n=name.toLowerCase().trim();if(idx[n])return idx[
 // ═══════════════════════════════════════════════
 function buildMasterIndex(sheets){
   const idx={};
-  for(const[,rows]of Object.entries(sheets)){
+  _knownLeagues = new Set();
+  for(const[shKey,rows]of Object.entries(sheets)){
+    if(!rows.length)continue;
+    // Extract division/league name from sheet key (format: "filename::sheetname")
+    const shName = shKey.includes('::') ? shKey.split('::').pop() : shKey;
+    const leagueName = divName(shName).toLowerCase().trim();
+    if(leagueName) _knownLeagues.add(leagueName);
     if(!rows.length)continue;
     const c=getCols(rows,C_HOME,C_AWAY,null,null);
     if(!c||(!c.home&&!c.away))continue;
@@ -2092,6 +2133,7 @@ document.getElementById('runBtn').addEventListener('click',async()=>{
     await new Promise(r=>setTimeout(r,0));
     const totalMatches = Object.values(matchStore).reduce((s,m)=>s+m.length,0);
     log(`Season filter: ${totalMatches} match records from ${SEASON_START.toDateString()} onwards`,'ok');
+    log(`Known leagues (from loaded files): ${[..._knownLeagues].sort().join(', ')}`,'ok');
     _leagueOSIs=buildLeagueOSIs(n,alpha);
     log(`OSI mode: ${osiMode} · league OSI range: [${Math.min(..._leagueOSIs).toFixed(2)}, ${Math.max(..._leagueOSIs).toFixed(2)}] · recency α=${alpha.toFixed(2)}`,'ok');
 
