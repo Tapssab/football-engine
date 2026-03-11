@@ -495,7 +495,7 @@ table.ftable tbody tr.hot td:first-child{box-shadow:inset 2px 0 0 var(--accent)}
     <div class="tb-stat">Fixtures: <b id="ts-fix">0</b></div>
     <div class="tb-stat">Teams: <b id="ts-teams">0</b></div>
     <div class="tb-stat">BTTS &gt;70%: <b id="ts-high">0</b></div>
-    <div class="tb-stat">Leagues: <b id="ts-files">0</b></div>
+    <div class="tb-stat">Files: <b id="ts-files">0</b></div>
     <div class="tb-stat">Latest Data: <b id="ts-date" style="color:var(--accent)">—</b></div>
     <div class="tb-stat">Model: <b id="ts-mode" style="color:var(--accent)">RAW</b></div>
   </div>
@@ -507,18 +507,27 @@ table.ftable tbody tr.hot td:first-child{box-shadow:inset 2px 0 0 var(--accent)}
   <aside class="sidebar">
 
     <div>
-      <div class="sb-hd">Historical Data <span style="font-family:var(--mono);font-size:.5rem;color:var(--accent);float:right" id="apiCacheStatus"></span></div>
-      <div style="margin-bottom:8px">
-        <div style="font-family:var(--mono);font-size:.55rem;color:var(--t3);margin-bottom:5px">API Key</div>
-        <input id="apiKey" type="password" placeholder="Enter API-Football key…" style="width:100%;background:var(--glass);border:1px solid var(--gb);border-radius:6px;padding:6px 8px;color:var(--t1);font-family:var(--mono);font-size:.6rem;box-sizing:border-box">
+      <div class="sb-hd">Historical Data</div>
+      <div class="file-list" id="fileList">
+        <div class="add-file-empty" id="fileEmptyMsg">No files loaded yet</div>
       </div>
-      <div style="margin-bottom:8px">
-        <div style="font-family:var(--mono);font-size:.55rem;color:var(--t3);margin-bottom:5px">Season</div>
-        <input id="apiSeason" type="number" value="2025" min="2010" max="2030" style="width:100%;background:var(--glass);border:1px solid var(--gb);border-radius:6px;padding:6px 8px;color:var(--t1);font-family:var(--mono);font-size:.6rem;box-sizing:border-box">
+      <div class="add-file-btn" style="margin-top:7px">
+        <input type="file" id="fileA" accept=".xlsx,.xls">
+        <span class="add-file-plus">＋</span>
+        <span>Add Results File</span>
       </div>
-      <button class="run-btn" id="fetchBtn" onclick="fetchAllLeagues()" style="width:100%;margin-bottom:6px;background:linear-gradient(135deg,#1a1f2e,#0d1117);border:1px solid var(--accent)" disabled>⬇ Fetch League Data</button>
-      <div style="font-family:var(--mono);font-size:.52rem;color:var(--t3);text-align:center;margin-bottom:6px" id="fetchProgress"></div>
-      <button onclick="clearApiCache()" style="width:100%;padding:5px;background:transparent;border:1px solid var(--gb);border-radius:6px;color:var(--t3);font-family:var(--mono);font-size:.52rem;cursor:pointer">🗑 Clear Cached Data</button>
+      <button class="drive-btn" id="driveBtn" onclick="loadFromDrive()">
+        <svg width="16" height="16" viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg">
+          <path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/>
+          <path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z" fill="#00ac47"/>
+          <path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#ea4335"/>
+          <path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/>
+          <path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/>
+          <path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 28h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/>
+        </svg>
+        Load from Google Drive
+      </button>
+      <div class="drive-status" id="driveStatus"></div>
     </div>
 
     <div>
@@ -756,262 +765,136 @@ table.ftable tbody tr.hot td:first-child{box-shadow:inset 2px 0 0 var(--accent)}
 
 <script>
 // ═══════════════════════════════════════════════
-// API-FOOTBALL INTEGRATION
-// Replaces football-data.co.uk file loading
+// GOOGLE DRIVE LOADER
 // ═══════════════════════════════════════════════
-const API_HOST = 'https://v3.football.api-sports.io';
-const API_CACHE_KEY = 'footballEngine_apiCache_v1';
-const API_CACHE_TS_KEY = 'footballEngine_apiCacheTS_v1';
+const DRIVE_FOLDER_ID = '1FSKEeRH22QXiPPNZ6FmTtC1yuQqKkCtK';
 
-// All 90 leagues with confirmed IDs
-const API_LEAGUES = [
-  // Europe — Top
-  {id:39,  name:'English Premier League',     region:'Europe'},
-  {id:78,  name:'German Bundesliga',          region:'Europe'},
-  {id:140, name:'Spanish La Liga',            region:'Europe'},
-  {id:135, name:'Italian Serie A',            region:'Europe'},
-  {id:61,  name:'French Ligue 1',             region:'Europe'},
-  {id:88,  name:'Dutch Eredivisie',           region:'Europe'},
-  {id:94,  name:'Portuguese Primeira Liga',   region:'Europe'},
-  {id:203, name:'Turkish Süper Lig',          region:'Europe'},
-  {id:144, name:'Belgian Pro League',         region:'Europe'},
-  {id:179, name:'Scottish Premiership',       region:'Europe'},
-  {id:207, name:'Swiss Super League',         region:'Europe'},
-  {id:218, name:'Austrian Bundesliga',        region:'Europe'},
-  {id:119, name:'Danish Superliga',           region:'Europe'},
-  {id:103, name:'Norwegian Eliteserien',      region:'Europe'},
-  {id:113, name:'Swedish Allsvenskan',        region:'Europe'},
-  {id:235, name:'Russian Premier League',     region:'Europe'},
-  {id:333, name:'Ukrainian Premier League',   region:'Europe'},
-  {id:106, name:'Polish Ekstraklasa',         region:'Europe'},
-  {id:197, name:'Greek Super League',         region:'Europe'},
-  {id:345, name:'Czech First League',         region:'Europe'},
-  // Europe — Second Tiers & Cups
-  {id:40,  name:'English Championship',       region:'Europe'},
-  {id:79,  name:'German 2. Bundesliga',       region:'Europe'},
-  {id:141, name:'Spanish Segunda División',   region:'Europe'},
-  {id:136, name:'Italian Serie B',            region:'Europe'},
-  {id:62,  name:'French Ligue 2',             region:'Europe'},
-  {id:89,  name:'Dutch Eerste Divisie',       region:'Europe'},
-  {id:41,  name:'English League One',         region:'Europe'},
-  {id:42,  name:'English League Two',         region:'Europe'},
-  {id:43,  name:'English National League',    region:'Europe'},
-  {id:44,  name:'Eng National League North',  region:'Europe'},
-  {id:45,  name:'Eng National League South',  region:'Europe'},
-  {id:180, name:'Scottish Championship',      region:'Europe'},
-  {id:181, name:'Scottish League One',        region:'Europe'},
-  {id:95,  name:'Portuguese Liga 2',          region:'Europe'},
-  {id:204, name:'Turkish TFF 1. Lig',         region:'Europe'},
-  {id:107, name:'Polish I Liga',              region:'Europe'},
-  {id:80,  name:'German 3. Liga',             region:'Europe'},
-  {id:283, name:'Romanian Liga I',            region:'Europe'},
-  {id:172, name:'Bulgarian First League',     region:'Europe'},
-  {id:210, name:'Croatian HNL',               region:'Europe'},
-  // Americas
-  {id:71,  name:'Brazilian Série A',          region:'Americas'},
-  {id:72,  name:'Brazilian Série B',          region:'Americas'},
-  {id:128, name:'Argentine Primera División', region:'Americas'},
-  {id:131, name:'Argentine Primera Nacional', region:'Americas'},
-  {id:253, name:'MLS',                        region:'Americas'},
-  {id:254, name:'USL Championship',           region:'Americas'},
-  {id:262, name:'Liga MX',                    region:'Americas'},
-  {id:263, name:'Liga de Expansión MX',       region:'Americas'},
-  {id:239, name:'Colombian Categoría Primera A', region:'Americas'},
-  {id:240, name:'Colombian Primera B',        region:'Americas'},
-  {id:242, name:'Ecuadorian Serie A',         region:'Americas'},
-  {id:265, name:'Chilean Primera División',   region:'Americas'},
-  {id:266, name:'Chilean Primera B',          region:'Americas'},
-  {id:268, name:'Uruguayan Primera División', region:'Americas'},
-  {id:244, name:'Paraguayan Primera División',region:'Americas'},
-  {id:281, name:'Peruvian Primera División',  region:'Americas'},
-  {id:232, name:'Bolivian Primera División',  region:'Americas'},
-  {id:162, name:'Costa Rican Primera División',region:'Americas'},
-  {id:261, name:'Honduran Liga Nacional',     region:'Americas'},
-  {id:255, name:'Canadian Premier League',    region:'Americas'},
-  // Asia & Oceania
-  {id:307, name:'Saudi Pro League',           region:'Asia'},
-  {id:308, name:'Saudi First Division',       region:'Asia'},
-  {id:98,  name:'Japanese J1 League',         region:'Asia'},
-  {id:99,  name:'Japanese J2 League',         region:'Asia'},
-  {id:292, name:'South Korean K League 1',    region:'Asia'},
-  {id:293, name:'South Korean K League 2',    region:'Asia'},
-  {id:188, name:'Australian A-League',        region:'Asia'},
-  {id:195, name:'Australian NPL Victoria',    region:'Asia'},
-  {id:192, name:'Australian NPL NSW',         region:'Asia'},
-  {id:169, name:'Chinese Super League',       region:'Asia'},
-  {id:296, name:'Thai League 1',              region:'Asia'},
-  {id:435, name:'UAE Pro League',             region:'Asia'},
-  {id:282, name:'Qatar Stars League',         region:'Asia'},
-  {id:323, name:'Indian Super League',        region:'Asia'},
-  {id:340, name:'Vietnamese V.League 1',      region:'Asia'},
-  // Africa & Middle East
-  {id:233, name:'Egyptian Premier League',    region:'Africa'},
-  {id:288, name:'South African PSL',          region:'Africa'},
-  {id:289, name:'SA National First Division', region:'Africa'},
-  {id:200, name:'Moroccan Botola Pro',        region:'Africa'},
-  {id:197, name:'Algerian Ligue 1',           region:'Africa'},
-  {id:202, name:'Tunisian Ligue Pro 1',       region:'Africa'},
-  {id:663, name:'Nigerian NPFL',              region:'Africa'},
-  {id:567, name:'Tanzanian Premier League',   region:'Africa'},
-  {id:276, name:'Kenyan Premier League',      region:'Africa'},
-  {id:570, name:'Ghanaian Premier League',    region:'Africa'},
-  {id:400, name:'Zambian Super League',       region:'Africa'},
-  {id:397, name:'Angolan Giraboloa',          region:'Africa'},
-  {id:290, name:'Iranian Pro League',         region:'Africa'},
-  {id:291, name:'Iranian Azadegan League',    region:'Africa'},
-  {id:348, name:'Kuwait Premier League',      region:'Africa'},
+const DRIVE_FILES = [
+  'Latest_Results_Main.xlsx',
+  'All_Euro_Data_2526.xlsx',
+  'New_Leagues_Data.xlsx',
+  'Latest_Results_New.xlsx'
 ];
 
-let apiCache = {}; // leagueId -> array of match objects
+let driveAccessToken = null;
 
-function apiStatus(msg, type='') {
-  document.getElementById('fetchProgress').textContent = msg;
-  document.getElementById('fetchProgress').style.color =
-    type==='ok' ? 'var(--accent)' : type==='err' ? 'var(--a2)' : 'var(--t3)';
+function driveStatus(msg, type) {
+  const el = document.getElementById('driveStatus');
+  el.textContent = msg;
+  el.className = 'drive-status ' + type;
 }
 
-function updateCacheStatus() {
-  const ts = localStorage.getItem(API_CACHE_TS_KEY);
-  const el = document.getElementById('apiCacheStatus');
-  if (ts) {
-    const d = new Date(parseInt(ts));
-    el.textContent = '✓ ' + d.toLocaleDateString('en-GB',{day:'2-digit',month:'short'});
-  } else {
-    el.textContent = '';
-  }
-}
-
-function loadApiCache() {
-  try {
-    const raw = localStorage.getItem(API_CACHE_KEY);
-    if (!raw) return false;
-    apiCache = JSON.parse(raw);
-    ingestApiCache();
-    updateCacheStatus();
-    return true;
-  } catch(e) { return false; }
-}
-
-function saveApiCache() {
-  try {
-    localStorage.setItem(API_CACHE_KEY, JSON.stringify(apiCache));
-    localStorage.setItem(API_CACHE_TS_KEY, Date.now().toString());
-    updateCacheStatus();
-  } catch(e) { log('Cache save failed — data too large for localStorage','err'); }
-}
-
-function clearApiCache() {
-  localStorage.removeItem(API_CACHE_KEY);
-  localStorage.removeItem(API_CACHE_TS_KEY);
-  apiCache = {};
-  histSheets = {};
-  loadedFiles = [];
-  masterIdx = {}; matchStore = {};
-  document.getElementById('ts-files').textContent = 0;
-  document.getElementById('ts-teams').textContent = 0;
-  document.getElementById('apiCacheStatus').textContent = '';
-  document.getElementById('runBtn').disabled = true;
-  apiStatus('Cache cleared');
-  log('API cache cleared','err');
-}
-
-// Convert API-Football fixture response into the same row format
-// as football-data.co.uk so the rest of the engine is unchanged
-function apiFixturesToRows(fixtures) {
-  return fixtures
-    .filter(f => f.fixture.status.short === 'FT') // finished only
-    .map(f => ({
-      HomeTeam: f.teams.home.name,
-      AwayTeam: f.teams.away.name,
-      FTHG: String(f.goals.home ?? ''),
-      FTAG: String(f.goals.away ?? ''),
-      Date: f.fixture.date ? f.fixture.date.split('T')[0] : '',
-    }));
-}
-
-function ingestApiCache() {
-  histSheets = {};
-  loadedFiles = [];
-  let totalLeagues = 0;
-  for (const [leagueId, rows] of Object.entries(apiCache)) {
-    if (!rows.length) continue;
-    const league = API_LEAGUES.find(l => l.id === parseInt(leagueId));
-    const sheetName = league ? league.name : `League_${leagueId}`;
-    histSheets[`api::${sheetName}`] = rows;
-    loadedFiles.push(sheetName);
-    totalLeagues++;
-  }
-  rebuildIndex();
-  document.getElementById('ts-files').textContent = totalLeagues;
-  log(`API cache ingested — ${totalLeagues} leagues · ${Object.keys(masterIdx).length} teams`, 'ok');
-}
-
-async function fetchLeague(apiKey, leagueId, season) {
-  const url = `${API_HOST}/fixtures?league=${leagueId}&season=${season}`;
-  const res = await fetch(url, {
-    headers: { 'x-apisports-key': apiKey }
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const data = await res.json();
-  if (data.errors && Object.keys(data.errors).length) {
-    throw new Error(JSON.stringify(data.errors));
-  }
-  return data.response || [];
-}
-
-async function fetchAllLeagues() {
-  const apiKey = document.getElementById('apiKey').value.trim();
-  const season = document.getElementById('apiSeason').value.trim();
-  if (!apiKey) { apiStatus('Enter your API key first', 'err'); return; }
-
-  const btn = document.getElementById('fetchBtn');
+async function loadFromDrive() {
+  const btn = document.getElementById('driveBtn');
   btn.disabled = true;
-  btn.textContent = '⏳ Fetching…';
+  driveStatus('Signing in to Google…', 'loading');
 
-  const total = API_LEAGUES.length;
-  let done = 0, failed = 0;
-
-  for (const league of API_LEAGUES) {
-    apiStatus(`Fetching ${done+1}/${total} — ${league.name}…`);
-    try {
-      const fixtures = await fetchLeague(apiKey, league.id, season);
-      const rows = apiFixturesToRows(fixtures);
-      apiCache[league.id] = rows;
-      done++;
-      log(`✓ ${league.name}: ${rows.length} finished matches`, 'ok');
-    } catch(e) {
-      failed++;
-      log(`✗ ${league.name} (${league.id}): ${e.message}`, 'err');
-      apiCache[league.id] = []; // store empty so we don't re-fetch
+  try {
+    if (!window.google || !window.google.accounts) {
+      await loadScript('https://accounts.google.com/gsi/client');
     }
-    // Small delay to be polite to the API
-    await new Promise(r => setTimeout(r, 120));
+
+    driveAccessToken = await getGoogleAccessToken();
+    driveStatus('Connected — fetching files from Drive…', 'loading');
+
+    let loaded = 0;
+    let skipped = 0;
+    const errors = [];
+
+    for (const filename of DRIVE_FILES) {
+      try {
+        const searchUrl = `https://www.googleapis.com/drive/v3/files?q=name='${filename}'+and+'${DRIVE_FOLDER_ID}'+in+parents+and+trashed=false&fields=files(id,name,modifiedTime)`;
+        const searchRes = await fetch(searchUrl, {
+          headers: { Authorization: 'Bearer ' + driveAccessToken }
+        });
+        const searchData = await searchRes.json();
+        log(`Drive search [${filename}]: status=${searchRes.status} files=${searchData.files?searchData.files.length:'err'} ${searchData.error?JSON.stringify(searchData.error):''}`, 'ok');
+
+        if (searchData.error) {
+          log(`Drive API error for ${filename}: ${JSON.stringify(searchData.error)}`, 'err');
+          errors.push(filename);
+          continue;
+        }
+        if (!searchData.files || searchData.files.length === 0) {
+          skipped++;
+          log(`Drive: ${filename} not found in folder — skipping`, 'err');
+          continue;
+        }
+
+        const fileId = searchData.files[0].id;
+        const modified = new Date(searchData.files[0].modifiedTime).toLocaleDateString();
+
+        const dlRes = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+          headers: { Authorization: 'Bearer ' + driveAccessToken }
+        });
+
+        if (!dlRes.ok) { errors.push(filename); continue; }
+
+        const arrayBuffer = await dlRes.arrayBuffer();
+        const wb = XLSX.read(arrayBuffer, { type: 'array' });
+        const sheets = {};
+        for (const n of wb.SheetNames) {
+          sheets[n] = XLSX.utils.sheet_to_json(wb.Sheets[n], { defval: '', raw: false });
+        }
+
+        if (loadedFiles.includes(filename)) {
+          Object.keys(histSheets).filter(k => k.startsWith(filename + '::')).forEach(k => delete histSheets[k]);
+          loadedFiles.splice(loadedFiles.indexOf(filename), 1);
+        }
+
+        for (const [sh, rows] of Object.entries(sheets)) {
+          histSheets[`${filename}::${sh}`] = rows;
+        }
+        loadedFiles.push(filename);
+        loaded++;
+        log(`✓ Drive: ${filename} (updated ${modified})`, 'ok');
+
+      } catch (e) {
+        errors.push(filename);
+        log(`Drive error — ${filename}: ${e.message}`, 'err');
+      }
+    }
+
+    rebuildIndex();
+    renderFileList();
+
+    if (loaded > 0) {
+      driveStatus(`✓ ${loaded} file${loaded>1?'s':''} loaded from Drive`, 'ok');
+      log(`Drive sync complete — ${Object.keys(masterIdx).length} teams indexed`, 'ok');
+    } else {
+      driveStatus('No files found — run the Apps Script sync first', 'err');
+    }
+
+  } catch(e) {
+    driveStatus('Sign-in failed or cancelled', 'err');
+    log('Drive: ' + e.message, 'err');
   }
 
-  saveApiCache();
-  ingestApiCache();
-
-  apiStatus(`✓ ${done} leagues fetched${failed ? `, ${failed} failed` : ''}`, done > 0 ? 'ok' : 'err');
-  log(`API fetch complete — ${done}/${total} leagues`, done === total ? 'ok' : 'err');
-
-  btn.textContent = '⬇ Fetch League Data';
   btn.disabled = false;
 }
 
-// Enable fetch button when API key is typed
-document.addEventListener('DOMContentLoaded', () => {
-  const keyInput = document.getElementById('apiKey');
-  if (keyInput) {
-    keyInput.addEventListener('input', () => {
-      document.getElementById('fetchBtn').disabled = !keyInput.value.trim();
+function loadScript(src) {
+  return new Promise((res, rej) => {
+    if (document.querySelector(`script[src="${src}"]`)) { res(); return; }
+    const s = document.createElement('script');
+    s.src = src; s.onload = res; s.onerror = rej;
+    document.head.appendChild(s);
+  });
+}
+
+function getGoogleAccessToken() {
+  return new Promise((res, rej) => {
+    const client = google.accounts.oauth2.initTokenClient({
+      client_id: '591112365835-jgof6m331fql9vla8ep1fkqc4fq4f9mr.apps.googleusercontent.com',
+      scope: 'https://www.googleapis.com/auth/drive',
+      callback: (tokenResponse) => {
+        if (tokenResponse.error) { rej(new Error(tokenResponse.error)); return; }
+        res(tokenResponse.access_token);
+      }
     });
-  }
-  // Try loading from cache on startup
-  if (loadApiCache()) {
-    apiStatus('Data loaded from cache', 'ok');
-  }
-  updateCacheStatus();
-});
+    client.requestAccessToken({ prompt: 'consent' });
+  });
+}
 
 // ═══════════════════════════════════════════════
 // SETTINGS — save / load via localStorage
@@ -1103,13 +986,7 @@ function launchSport(sport) {
   shell.style.opacity = '0';
   shell.style.transition = 'opacity .3s ease';
   requestAnimationFrame(() => { shell.style.opacity = '1'; });
-  // Restore saved settings
   loadSettings();
-  // Load API cache if available
-  if (loadApiCache()) {
-    apiStatus('Data loaded from cache', 'ok');
-  }
-  updateCacheStatus();
 }
 
 function goHome() {
@@ -1118,17 +995,21 @@ function goHome() {
 }
 
 function resetApp() {
-  // Clear runtime data but keep API cache intact
+  // Clear all loaded data
   histSheets = {}; fixSheets = null;
   masterIdx = {}; matchStore = {};
   allRows = []; visRows = []; loadedFiles = [];
   _leagueOSIs = []; _eloRatings = new Map(); _leagueParams = {}; _teamRatings = {};
 
-  // Reset fixture file input
+  // Reset file inputs so same file can be re-added
+  const fa = document.getElementById('fileA');
   const fb = document.getElementById('fileB');
+  if (fa) fa.value = '';
   if (fb) fb.value = '';
 
   // Reset UI
+  document.getElementById('fileList').querySelectorAll('.file-item').forEach(el => el.remove());
+  document.getElementById('fileEmptyMsg').style.display = '';
   document.getElementById('stB').textContent = '';
   document.getElementById('cardB').classList.remove('active');
   document.getElementById('topStats').style.display = 'none';
