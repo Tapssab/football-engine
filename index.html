@@ -1316,7 +1316,7 @@ function detectLeague(home,away,sheets,idx){
   const ct={};
   for(const[sh,rows]of Object.entries(sheets)){if(!rows.length)continue;const c=getCols(rows,C_HOME,C_AWAY,null,null);if(!c||!c.home||!c.away)continue;let n=0;for(const r of rows){const h=String(r[c.home]||'').toLowerCase().trim(),a=String(r[c.away]||'').toLowerCase().trim();if(rH&&(h===rH.toLowerCase()||a===rH.toLowerCase()))n++;if(rA&&(h===rA.toLowerCase()||a===rA.toLowerCase()))n++;}if(n>0)ct[sh]=n;}
   if(!Object.keys(ct).length)return'Unknown';
-  return divName(Object.entries(ct).sort((a,b)=>b[1]-a[1])[0][0]);
+  return Object.entries(ct).sort((a,b)=>b[1]-a[1])[0][0];
 }
 
 // ═══════════════════════════════════════════════
@@ -1433,7 +1433,8 @@ function buildLeagueParams(n, alpha=1.0) {
     if (!rows.length) continue;
     const c = getCols(rows, C_HOME, C_AWAY, C_FTHG, C_FTAG);
     if (!c || !c.home || !c.away || !c.fthg || !c.ftag) continue;
-    const league = divName(sh);
+    // Use full sheet key as league identifier so each sheet is its own league
+    const league = sh;
     if (!leagueGoals[league]) leagueGoals[league] = { homeGoals:0, awayGoals:0, homeGames:0, awayGames:0 };
     const lg = leagueGoals[league];
     for (const r of rows) {
@@ -1452,10 +1453,7 @@ function buildLeagueParams(n, alpha=1.0) {
     const avgHome = lg.homeGoals / lg.homeGames;
     const avgAway = lg.awayGoals / lg.awayGames;
     const avgScored = (lg.homeGoals + lg.awayGoals) / (lg.homeGames + lg.awayGames);
-    // homeAdv = ratio of home scoring rate to away scoring rate
-    // Typical Premier League: ~1.20-1.35. Derived from actual data.
     const homeAdv = avgAway > 0 ? avgHome / avgAway : 1.15;
-    // Distribute symmetrically using sqrt
     const homeAdvFactor = Math.sqrt(homeAdv);
     const awayAdvFactor = 1 / homeAdvFactor;
     params[league] = { avgScored, avgHome, avgAway, homeAdv, homeAdvFactor, awayAdvFactor };
@@ -1497,7 +1495,7 @@ function buildTeamRatings(n, leagueParams, alpha=1.0) {
           const a = String(r[c.away]||'').toLowerCase().trim();
           if (h === teamKey || a === teamKey) count++;
         }
-        if (count > 0) ct[divName(sh)] = (ct[divName(sh)]||0) + count;
+        if (count > 0) ct[sh] = (ct[sh]||0) + count;
       }
       const topLeague = Object.entries(ct).sort((a,b) => b[1]-a[1])[0];
       if (!topLeague) return { lp: null, name: null };
