@@ -111,6 +111,22 @@ input[type=range]{flex:1;accent-color:var(--accent);height:3px}
 .wsl-sum.ok{color:var(--accent)}
 .wsl-sum.err{color:var(--a2)}
 
+/* ── O/U TOGGLE ── */
+.ctog-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.ctog-lbl{font-family:var(--mono);font-size:.58rem;color:var(--t2)}
+.ctog-sw{position:relative;display:inline-block;width:32px;height:18px}
+.ctog-sw input{opacity:0;width:0;height:0}
+.ctog-sl{position:absolute;cursor:pointer;inset:0;background:var(--gb);border-radius:9px;transition:.2s}
+.ctog-sl::before{content:'';position:absolute;width:12px;height:12px;left:3px;bottom:3px;background:var(--t3);border-radius:50%;transition:.2s}
+.ctog-sw input:checked+.ctog-sl{background:var(--ag);border:1px solid var(--accent)}
+.ctog-sw input:checked+.ctog-sl::before{transform:translateX(14px);background:var(--accent)}
+.ctog-thresh{max-height:0;overflow:hidden;transition:max-height .25s ease}
+.ctog-thresh.open{max-height:200px}
+
+/* ── SAVE BTN ── */
+.save-btn{width:100%;padding:7px;background:var(--glass);border:1px solid var(--gb);border-radius:6px;color:var(--t2);font-family:var(--mono);font-size:.6rem;cursor:pointer;transition:var(--tr)}
+.save-btn:hover{border-color:var(--accent);color:var(--accent)}
+
 /* ── DRIVE BTN ── */
 .drive-btn{display:flex;align-items:center;gap:8px;width:100%;padding:8px 12px;background:var(--glass);border:1px solid var(--gb);border-radius:var(--rs);color:var(--t1);font-size:.65rem;font-weight:600;cursor:pointer;transition:var(--tr);margin-top:8px}
 .drive-btn:hover{border-color:#4285f4;background:rgba(66,133,244,.08);color:#4285f4}
@@ -352,7 +368,44 @@ td{padding:7px 10px;vertical-align:middle}
         <div class="wsl-row"><span class="wsl-lbl">🟡 Elo</span><input type="range" class="wsl-inp" id="wElo" min="0" max="100" value="30" oninput="onWeightChange()"><span class="wsl-val" id="wEloVal">0.30</span></div>
         <div class="wsl-row"><span class="wsl-lbl">🔴 Form</span><input type="range" class="wsl-inp" id="wForm" min="0" max="100" value="20" oninput="onWeightChange()"><span class="wsl-val" id="wFormVal">0.20</span></div>
         <div class="wsl-sum ok" id="wSumLabel">Σ = 1.00 ✓</div>
+        <div style="font-size:.58rem;color:var(--t3);margin-top:6px;border-top:1px solid var(--gb);padding-top:6px">Confidence Weights</div>
+        <div class="wsl-row"><span class="wsl-lbl">Sample</span><input type="range" class="wsl-inp" id="cAlpha" min="0" max="100" value="35" oninput="onWeightChange()"><span class="wsl-val" id="cAlphaVal">0.35</span></div>
+        <div class="wsl-row"><span class="wsl-lbl">Agreement</span><input type="range" class="wsl-inp" id="cBeta" min="0" max="100" value="30" oninput="onWeightChange()"><span class="wsl-val" id="cBetaVal">0.30</span></div>
+        <div class="wsl-row"><span class="wsl-lbl">Signal</span><input type="range" class="wsl-inp" id="cGamma" min="0" max="100" value="20" oninput="onWeightChange()"><span class="wsl-val" id="cGammaVal">0.20</span></div>
+        <div class="wsl-row"><span class="wsl-lbl">Stability</span><input type="range" class="wsl-inp" id="cDelta" min="0" max="100" value="15" oninput="onWeightChange()"><span class="wsl-val" id="cDeltaVal">0.15</span></div>
       </div>
+    </div>
+
+    <div>
+      <div class="sb-hd">O/U Conservative Filter</div>
+      <div class="ctog-row">
+        <span class="ctog-lbl">Use Conservative Filter</span>
+        <label class="ctog-sw">
+          <input type="checkbox" id="conservToggle" checked onchange="onConservChange()">
+          <span class="ctog-sl"></span>
+        </label>
+      </div>
+      <div class="ctog-thresh open" id="conservThresh">
+        <div class="wsl-row">
+          <span class="wsl-lbl" style="width:70px;font-size:.58rem">Over 3.5 ≥</span>
+          <input type="range" class="wsl-inp" id="over35Thresh" min="20" max="90" value="55" step="1" oninput="onConservChange()">
+          <span class="wsl-val" id="over35Val">0.55</span>
+        </div>
+        <div class="wsl-row">
+          <span class="wsl-lbl" style="width:70px;font-size:.58rem">Under 1.5 ≥</span>
+          <input type="range" class="wsl-inp" id="under15Thresh" min="20" max="90" value="55" step="1" oninput="onConservChange()">
+          <span class="wsl-val" id="under15Val">0.55</span>
+        </div>
+        <div style="font-size:.55rem;color:var(--t3);line-height:1.6;margin-top:4px">
+          Over signal: P(goals &gt; 3.5)<br>Under signal: P(goals &le; 1.0)
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="sb-hd">Settings</div>
+      <button class="save-btn" onclick="saveSettings()">💾 Save Settings</button>
+      <div style="font-family:var(--mono);font-size:.52rem;color:var(--t3);margin-top:4px;text-align:center" id="saveStatus"></div>
     </div>
 
     <div>
@@ -1261,10 +1314,76 @@ function onWeightChange() {
   document.getElementById('wPoissonVal').textContent=(p/100).toFixed(2);
   document.getElementById('wEloVal').textContent=(e/100).toFixed(2);
   document.getElementById('wFormVal').textContent=(f/100).toFixed(2);
+  ['cAlpha','cBeta','cGamma','cDelta'].forEach(id=>{
+    const el=document.getElementById(id);
+    const vEl=document.getElementById(id+'Val');
+    if(el&&vEl) vEl.textContent=(parseInt(el.value)/100).toFixed(2);
+  });
   const lbl=document.getElementById('wSumLabel');
   lbl.textContent='Σ = '+(s/100).toFixed(2)+(s===100?' ✓':' ✗');
   lbl.className='wsl-sum '+(s===100?'ok':'err');
   if (allRows.length) applyFilters();
+}
+
+function onConservChange() {
+  const on = document.getElementById('conservToggle').checked;
+  document.getElementById('conservThresh').classList.toggle('open', on);
+  const v35 = parseInt(document.getElementById('over35Thresh').value)/100;
+  const v15 = parseInt(document.getElementById('under15Thresh').value)/100;
+  document.getElementById('over35Val').textContent = v35.toFixed(2);
+  document.getElementById('under15Val').textContent = v15.toFixed(2);
+  if (allRows.length) applyFilters();
+}
+
+// ═══════════════════════════════════════════════
+// SETTINGS — save / load via localStorage
+// ═══════════════════════════════════════════════
+const SETTINGS_KEY = 'footballEngine_settings_v1';
+
+function saveSettings() {
+  const s = {
+    decayAlpha:  document.getElementById('decaySlider').value,
+    ensMode, osiMode,
+    wPoisson:    document.getElementById('wPoisson').value,
+    wElo:        document.getElementById('wElo').value,
+    wForm:       document.getElementById('wForm').value,
+    cAlpha:      document.getElementById('cAlpha').value,
+    cBeta:       document.getElementById('cBeta').value,
+    cGamma:      document.getElementById('cGamma').value,
+    cDelta:      document.getElementById('cDelta').value,
+    conservOn:   document.getElementById('conservToggle').checked,
+    over35:      document.getElementById('over35Thresh').value,
+    under15:     document.getElementById('under15Thresh').value,
+    confFilter:  document.getElementById('fConf').value,
+  };
+  try {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+    const el=document.getElementById('saveStatus');
+    el.style.color='var(--accent)';
+    el.textContent='✓ Saved '+new Date().toLocaleTimeString();
+    setTimeout(()=>{el.textContent='';},3000);
+  } catch(e) {
+    document.getElementById('saveStatus').textContent='✗ Save failed';
+  }
+}
+
+function loadSettings() {
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    if (!raw) return;
+    const s = JSON.parse(raw);
+    if (s.decayAlpha) { document.getElementById('decaySlider').value=s.decayAlpha; document.getElementById('decayVal').textContent=(parseInt(s.decayAlpha)/100).toFixed(2); }
+    if (s.ensMode) setEnsMode(s.ensMode);
+    if (s.osiMode) setOsiMode(s.osiMode);
+    ['wPoisson','wElo','wForm','cAlpha','cBeta','cGamma','cDelta'].forEach(id=>{
+      if (s[id]!==undefined) { const el=document.getElementById(id); if(el) el.value=s[id]; }
+    });
+    if (s.conservOn!==undefined) { document.getElementById('conservToggle').checked=s.conservOn; onConservChange(); }
+    if (s.over35)   { document.getElementById('over35Thresh').value=s.over35; }
+    if (s.under15)  { document.getElementById('under15Thresh').value=s.under15; }
+    if (s.confFilter) { document.getElementById('fConf').value=s.confFilter; }
+    onWeightChange();
+  } catch(e) {}
 }
 
 // ═══════════════════════════════════════════════
@@ -1278,6 +1397,7 @@ function launchSport(sport) {
   shell.style.opacity='0';
   shell.style.transition='opacity .3s ease';
   requestAnimationFrame(()=>{shell.style.opacity='1';});
+  loadSettings();
 }
 
 function goHome() {
