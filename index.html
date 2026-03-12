@@ -1061,7 +1061,7 @@ const KNOWN_LEAGUES = new Set([
   // E0 — English Premier League
   'e0', 'english premier league', 'epl', 'premier league', 'england pl',
   // E1 — Championship
-  'e1', 'english football league championship', 'championship', 'efl championship', 'england d2', 'england championship',
+  'e1', 'english football league championship', 'championship', 'efl championship', 'england d2', 'england championship', 'english championship',
   // E2 — League One
   'e2', 'english football league one', 'league one', 'england d3', 'england league one',
   // E3 — League Two
@@ -1134,6 +1134,16 @@ const KNOWN_LEAGUES = new Set([
   'swz', 'swiss super league', 'super league', 'switzerland d1',
   // USA — MLS
   'usa', 'major league soccer', 'mls', 'usa mls',
+  // IND — India I-League
+  'india i-league', 'i-league', 'i league', 'india i league',
+  // IDN — Indonesia Super League
+  'indonesia super league', 'liga 1 indonesia', 'bri liga 1', 'indonesia liga 1',
+  // GEO — Georgian Umaglesi Liga
+  'georgia umaglesi liga', 'umaglesi liga', 'erovnuli liga', 'georgian league',
+  // NGA — Nigeria Premier League
+  'nigeria premier league', 'npfl', 'nigerian premier league',
+  // AFC Challenge League
+  'afc challenge league',
 ]);
 
 function findCol(s,als){const ks=Object.keys(s);for(const a of als){const n=a.toLowerCase().replace(/[\s_-]/g,'');const f=ks.find(k=>k.toLowerCase().replace(/[\s_-]/g,'')=== n);if(f)return f;}return null;}
@@ -1165,7 +1175,7 @@ const CROSS_COMPETITIONS = new Set([
   'africa cup of nations','afcon',
   'copa america',
   'concacaf gold cup',
-  'afc champions league','afc cup',
+  'afc champions league','afc cup','afc challenge league','afc champions league elite',
   'club world cup','fifa club world cup',
   // South America
   'copa libertadores','libertadores','conmebol libertadores',
