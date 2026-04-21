@@ -249,6 +249,11 @@ table.ftable tbody tr:hover{background:rgba(255,255,255,.045)}
 @keyframes rowin{from{opacity:0;transform:translateX(-4px)}to{opacity:1;transform:none}}
 td{padding:8px 11px;white-space:nowrap;vertical-align:middle}
 .td-fix{font-weight:600;font-size:.73rem}
+.fix-meta{display:flex;flex-wrap:wrap;gap:5px;margin-top:3px;align-items:center}
+.fix-ko{font-family:var(--mono);font-size:.52rem;color:var(--accent);background:rgba(0,229,160,.07);border:1px solid rgba(0,229,160,.18);border-radius:3px;padding:1px 6px;letter-spacing:.3px}
+.fix-ko b{color:var(--accent)}
+.fix-rd{font-family:var(--mono);font-size:.5rem;color:var(--t3);background:rgba(255,255,255,.04);border:1px solid var(--gb);border-radius:3px;padding:1px 6px;letter-spacing:.5px}
+.fix-lg{font-family:var(--mono);font-size:.5rem;color:var(--t3);letter-spacing:.3px}
 .td-lg{font-family:var(--mono);font-size:.58rem;color:var(--t3)}
 .tn{font-family:var(--mono);text-align:right}
 .tl{font-family:var(--mono);text-align:right}
@@ -533,13 +538,26 @@ table.ftable tbody tr.hot td:first-child{box-shadow:inset 2px 0 0 var(--accent)}
 
     <div>
       <div class="sb-hd">Upcoming Fixtures</div>
-      <div class="dz" id="cardB">
-        <input type="file" id="fileB" accept=".xlsx,.xls">
+      <!-- Drive fixtures status panel -->
+      <div class="dz" id="cardB" style="cursor:default">
         <div class="dz-icon">📅</div>
-        <div class="dz-title">Schedule</div>
-        <div class="dz-hint">Home + Away columns required</div>
+        <div class="dz-title">48-hr Schedule</div>
+        <div class="dz-hint">Loaded from Google Drive</div>
         <div class="dz-status b" id="stB"></div>
       </div>
+      <!-- Drive fixtures button (shown after history loads) -->
+      <button class="drive-btn" id="driveFixBtn" onclick="loadFixturesFromDrive(true)" style="margin-top:7px">
+        <svg width="16" height="16" viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg">
+          <path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/>
+          <path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z" fill="#00ac47"/>
+          <path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#ea4335"/>
+          <path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/>
+          <path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/>
+          <path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 28h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/>
+        </svg>
+        Refresh Fixtures from Drive
+      </button>
+      <div class="drive-status" id="driveFixStatus"></div>
     </div>
 
     <div>
@@ -654,7 +672,7 @@ table.ftable tbody tr.hot td:first-child{box-shadow:inset 2px 0 0 var(--accent)}
     <div class="empty" id="emptyState">
       <div class="empty-icon">📊</div>
       <div class="empty-title">No Analysis Yet</div>
-      <div class="empty-sub">Load historical results (one or more Excel files) and your fixture schedule, then click Run Analysis.</div>
+      <div class="empty-sub">Load historical results and upcoming fixtures from Google Drive using the buttons in the sidebar, then click Run Analysis.</div>
     </div>
     <div id="resultsArea" style="display:none">
       <div class="res-hd" id="filterSection">
@@ -667,6 +685,8 @@ table.ftable tbody tr.hot td:first-child{box-shadow:inset 2px 0 0 var(--accent)}
           <span class="sort-lbl">Sort</span>
           <select class="sort-sel" id="sortSel">
             <option value="">Default</option>
+            <option value="kickoff-a">Kickoff ↑ (earliest first)</option>
+            <option value="kickoff-d">Kickoff ↓ (latest first)</option>
             <option value="btts-d">BTTS % ↓</option>
             <option value="btts-a">BTTS % ↑</option>
             <option value="form-d">Form Diff ↓</option>
@@ -766,17 +786,22 @@ table.ftable tbody tr.hot td:first-child{box-shadow:inset 2px 0 0 var(--accent)}
 
 <script>
 // ═══════════════════════════════════════════════
-// GOOGLE DRIVE LOADER
+// GOOGLE DRIVE LOADER  (v2 — historical + fixtures)
 // ═══════════════════════════════════════════════
 const DRIVE_FOLDER_ID = '1FSKEeRH22QXiPPNZ6FmTtC1yuQqKkCtK';
 
-// These are the 4 exact filenames saved by the Apps Script
-const DRIVE_FILES = [
-  'Latest_Results_Main.xlsx',
-  'All_Euro_Data_2526.xlsx',
-  'New_Leagues_Data.xlsx',
-  'Latest_Results_New.xlsx'
+// Historical results files — loaded into histSheets
+const DRIVE_HIST_FILES = [
+  'Europe_Results.xlsx',
+  'Africa_Results.xlsx',
+  'Americas_Results.xlsx',
+  'Asia_ME_CIS_Results.xlsx',
+  'International_Competitions.xlsx',
+  'Daily_Patch.xlsx',
 ];
+
+// Fixtures file — loaded into fixSheets (replaces manual upload)
+const DRIVE_FIX_FILE = 'Upcoming_Fixtures.xlsx';
 
 let driveAccessToken = null;
 
@@ -786,80 +811,74 @@ function driveStatus(msg, type) {
   el.className = 'drive-status ' + type;
 }
 
+function driveFixStatus(msg, type) {
+  const el = document.getElementById('driveFixStatus');
+  if (!el) return;
+  el.textContent = msg;
+  el.className = 'drive-status ' + type;
+}
+
+// ── Helper: search + download one file from Drive ──────────────────
+async function driveDownloadFile(filename, token) {
+  const searchUrl = `https://www.googleapis.com/drive/v3/files?q=name='${filename}'+and+'${DRIVE_FOLDER_ID}'+in+parents+and+trashed=false&fields=files(id,name,modifiedTime)`;
+  const searchRes = await fetch(searchUrl, { headers: { Authorization: 'Bearer ' + token } });
+  const searchData = await searchRes.json();
+
+  if (searchData.error) throw new Error(`Drive API: ${JSON.stringify(searchData.error)}`);
+  if (!searchData.files || searchData.files.length === 0) return null; // not found
+
+  const fileId = searchData.files[0].id;
+  const modified = new Date(searchData.files[0].modifiedTime).toLocaleDateString();
+
+  const dlRes = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+    headers: { Authorization: 'Bearer ' + token }
+  });
+  if (!dlRes.ok) throw new Error(`Download failed: HTTP ${dlRes.status}`);
+
+  const arrayBuffer = await dlRes.arrayBuffer();
+  const wb = XLSX.read(arrayBuffer, { type: 'array' });
+  const sheets = {};
+  for (const n of wb.SheetNames) {
+    sheets[n] = XLSX.utils.sheet_to_json(wb.Sheets[n], { defval: '', raw: false });
+  }
+  return { sheets, modified };
+}
+
+// ── Main Drive load — historical results ───────────────────────────
 async function loadFromDrive() {
   const btn = document.getElementById('driveBtn');
   btn.disabled = true;
   driveStatus('Signing in to Google…', 'loading');
 
   try {
-    // Load the Google Identity Services script if not already loaded
     if (!window.google || !window.google.accounts) {
       await loadScript('https://accounts.google.com/gsi/client');
     }
-
-    // Request an access token with Drive read scope
     driveAccessToken = await getGoogleAccessToken();
-    driveStatus('Connected — fetching files from Drive…', 'loading');
+    driveStatus('Connected — fetching historical files…', 'loading');
 
     let loaded = 0;
-    let skipped = 0;
     const errors = [];
 
-    for (const filename of DRIVE_FILES) {
+    for (const filename of DRIVE_HIST_FILES) {
       try {
-        // Search for the file by name inside the folder
-        const searchUrl = `https://www.googleapis.com/drive/v3/files?q=name='${filename}'+and+'${DRIVE_FOLDER_ID}'+in+parents+and+trashed=false&fields=files(id,name,modifiedTime)`;
-        const searchRes = await fetch(searchUrl, {
-          headers: { Authorization: 'Bearer ' + driveAccessToken }
-        });
-        const searchData = await searchRes.json();
-        log(`Drive search [${filename}]: status=${searchRes.status} files=${searchData.files?searchData.files.length:'err'} ${searchData.error?JSON.stringify(searchData.error):''}`, 'ok');
-
-        if (searchData.error) {
-          log(`Drive API error for ${filename}: ${JSON.stringify(searchData.error)}`, 'err');
-          errors.push(filename);
-          continue;
-        }
-        if (!searchData.files || searchData.files.length === 0) {
-          skipped++;
+        log(`Drive: fetching ${filename}…`);
+        const result = await driveDownloadFile(filename, driveAccessToken);
+        if (!result) {
           log(`Drive: ${filename} not found in folder — skipping`, 'err');
           continue;
         }
-
-        const fileId = searchData.files[0].id;
-        const modified = new Date(searchData.files[0].modifiedTime).toLocaleDateString();
-
-        // Download the file content
-        const dlRes = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
-          headers: { Authorization: 'Bearer ' + driveAccessToken }
-        });
-
-        if (!dlRes.ok) {
-          errors.push(filename);
-          continue;
-        }
-
-        const arrayBuffer = await dlRes.arrayBuffer();
-        const wb = XLSX.read(arrayBuffer, { type: 'array' });
-        const sheets = {};
-        for (const n of wb.SheetNames) {
-          sheets[n] = XLSX.utils.sheet_to_json(wb.Sheets[n], { defval: '', raw: false });
-        }
-
-        // Skip if already loaded
+        // Replace if already loaded
         if (loadedFiles.includes(filename)) {
-          // Re-load with fresh data (replace)
           Object.keys(histSheets).filter(k => k.startsWith(filename + '::')).forEach(k => delete histSheets[k]);
           loadedFiles.splice(loadedFiles.indexOf(filename), 1);
         }
-
-        for (const [sh, rows] of Object.entries(sheets)) {
+        for (const [sh, rows] of Object.entries(result.sheets)) {
           histSheets[`${filename}::${sh}`] = rows;
         }
         loadedFiles.push(filename);
         loaded++;
-        log(`✓ Drive: ${filename} (updated ${modified})`, 'ok');
-
+        log(`✓ Drive: ${filename} (updated ${result.modified})`, 'ok');
       } catch (e) {
         errors.push(filename);
         log(`Drive error — ${filename}: ${e.message}`, 'err');
@@ -872,8 +891,10 @@ async function loadFromDrive() {
     if (loaded > 0) {
       driveStatus(`✓ ${loaded} file${loaded>1?'s':''} loaded from Drive`, 'ok');
       log(`Drive sync complete — ${Object.keys(masterIdx).length} teams indexed`, 'ok');
+      // Auto-load fixtures after history is ready
+      await loadFixturesFromDrive(false);
     } else {
-      driveStatus('No files found — run the Apps Script sync first', 'err');
+      driveStatus('No history files found — run Apps Script bulk download first', 'err');
     }
 
   } catch (e) {
@@ -882,6 +903,58 @@ async function loadFromDrive() {
   }
 
   btn.disabled = false;
+}
+
+// ── Load fixtures from Drive (can be called standalone too) ────────
+async function loadFixturesFromDrive(needsSignIn = true) {
+  const btn = document.getElementById('driveFixBtn');
+  if (btn) btn.disabled = true;
+  driveFixStatus('Loading fixtures from Drive…', 'loading');
+
+  try {
+    if (needsSignIn) {
+      if (!window.google || !window.google.accounts) {
+        await loadScript('https://accounts.google.com/gsi/client');
+      }
+      if (!driveAccessToken) {
+        driveAccessToken = await getGoogleAccessToken();
+      }
+    }
+
+    const result = await driveDownloadFile(DRIVE_FIX_FILE, driveAccessToken);
+
+    if (!result) {
+      driveFixStatus('Upcoming_Fixtures.xlsx not found — run fixturesUpdate() in Apps Script', 'err');
+      log('Drive fixtures: file not found in folder', 'err');
+      if (btn) btn.disabled = false;
+      return;
+    }
+
+    // Load into fixSheets — merge all sheets
+    fixSheets = {};
+    let totalRows = 0;
+    for (const [sh, rows] of Object.entries(result.sheets)) {
+      fixSheets[sh] = rows;
+      totalRows += rows.length;
+    }
+
+    driveFixStatus(`✓ ${totalRows} fixture${totalRows!==1?'s':''} loaded (updated ${result.modified})`, 'ok');
+    log(`✓ Drive fixtures: ${totalRows} upcoming fixtures loaded from ${Object.keys(fixSheets).length} sheet(s)`, 'ok');
+
+    // Update the fixtures panel UI
+    const stB = document.getElementById('stB');
+    if (stB) stB.textContent = `Drive · ${totalRows} fixtures · ${result.modified}`;
+    const cardB = document.getElementById('cardB');
+    if (cardB) cardB.classList.add('active');
+
+    checkReady();
+
+  } catch (e) {
+    driveFixStatus('Failed to load fixtures: ' + e.message, 'err');
+    log('Drive fixtures error: ' + e.message, 'err');
+  }
+
+  if (btn) btn.disabled = false;
 }
 
 function loadScript(src) {
@@ -1013,18 +1086,19 @@ function resetApp() {
   masterIdx = {}; matchStore = {};
   allRows = []; visRows = []; loadedFiles = [];
   _leagueOSIs = []; _eloRatings = new Map(); _leagueParams = {}; _teamRatings = {};
+  _leagueFreqStats = { avgDensity: 0.14, avgRest: 7.0 };
 
-  // Reset file inputs so same file can be re-added
+  // Reset file inputs so same file can be re-added if needed
   const fa = document.getElementById('fileA');
-  const fb = document.getElementById('fileB');
   if (fa) fa.value = '';
-  if (fb) fb.value = '';
 
   // Reset UI
   document.getElementById('fileList').querySelectorAll('.file-item').forEach(el => el.remove());
   document.getElementById('fileEmptyMsg').style.display = '';
   document.getElementById('stB').textContent = '';
   document.getElementById('cardB').classList.remove('active');
+  const dfs = document.getElementById('driveFixStatus');
+  if (dfs) { dfs.textContent = ''; dfs.className = 'drive-status'; }
   document.getElementById('topStats').style.display = 'none';
   document.getElementById('filterSection').style.display = 'none';
   document.getElementById('resultsArea').style.display = 'none';
@@ -1063,12 +1137,11 @@ const C_AWAY=['AwayTeam','Away Team','away_team','awayteam','away','Away','AT','
 const C_FTHG=['FTHG','fthg','HomeGoals','HG','Home Goals','Score H','GF','home goals'];
 const C_FTAG=['FTAG','ftag','AwayGoals','AG','Away Goals','Score A','GA','away goals'];
 const C_DATE=['Date','date','DATE','MatchDate','match_date'];
-const C_LEAGUE=['League','league','LEAGUE','Division','division','Div','div','Competition','competition','Comp','comp'];
 const DIV={E0:'Premier League',E1:'Championship',E2:'League One',E3:'League Two',EC:'National League',SC0:'Scottish Prem',SC1:'Scottish Champ',SC2:'Scottish L1',SC3:'Scottish L2',D1:'Bundesliga',D2:'Bundesliga 2',SP1:'La Liga',SP2:'La Liga 2',I1:'Serie A',I2:'Serie B',F1:'Ligue 1',F2:'Ligue 2',B1:'Belgian Pro',N1:'Eredivisie',P1:'Primeira Liga',T1:'Süper Lig',G1:'Super League GR'};
 const divName=s=>DIV[s]||s;
 
 function findCol(s,als){const ks=Object.keys(s);for(const a of als){const n=a.toLowerCase().replace(/[\s_-]/g,'');const f=ks.find(k=>k.toLowerCase().replace(/[\s_-]/g,'')=== n);if(f)return f;}return null;}
-function getCols(rows,hA,aA,fA,gA){if(!rows.length)return null;const s=rows[0];return{home:findCol(s,hA),away:findCol(s,aA),fthg:fA?findCol(s,fA):null,ftag:gA?findCol(s,gA):null,date:findCol(s,C_DATE),league:findCol(s,C_LEAGUE)};}
+function getCols(rows,hA,aA,fA,gA){if(!rows.length)return null;const s=rows[0];return{home:findCol(s,hA),away:findCol(s,aA),fthg:fA?findCol(s,fA):null,ftag:gA?findCol(s,gA):null,date:findCol(s,C_DATE)};}
 
 // ═══════════════════════════════════════════════
 // FUZZY MATCHING (Jaro-Winkler + token)
@@ -1086,7 +1159,7 @@ function fuzzy(name,idx){const n=name.toLowerCase().trim();if(idx[n])return idx[
 // ═══════════════════════════════════════════════
 function buildMasterIndex(sheets){
   const idx={};
-  for(const[shKey,rows]of Object.entries(sheets)){
+  for(const[,rows]of Object.entries(sheets)){
     if(!rows.length)continue;
     const c=getCols(rows,C_HOME,C_AWAY,null,null);
     if(!c||(!c.home&&!c.away))continue;
@@ -1201,13 +1274,19 @@ let UNDER15_THRESHOLD = 0.55;
 let useConservFilter  = true;
 
 function calcConservativeOU(lambdaTotal) {
-  if (lambdaTotal === null || lambdaTotal <= 0) return { under15: 0, over35: 0 };
-  const L = lambdaTotal;
+  // Guard: invalid or extreme lambda values
+  if (lambdaTotal === null || !isFinite(lambdaTotal) || lambdaTotal <= 0) return { under15: 0, over35: 0 };
+  // Cap lambda to prevent Math.exp underflow/overflow
+  const L = Math.max(0.1, Math.min(10, lambdaTotal));
   const eL = Math.exp(-L);
   const under15 = eL * (1 + L);
   const pLeq3   = eL * (1 + L + (L*L)/2 + (L*L*L)/6);
   const over35  = 1 - pLeq3;
-  return { under15: +under15.toFixed(6), over35: +over35.toFixed(6) };
+  // Clamp to [0, 1] to prevent floating-point drift
+  return {
+    under15: +Math.max(0, Math.min(1, under15)).toFixed(6),
+    over35:  +Math.max(0, Math.min(1, over35)).toFixed(6)
+  };
 }
 
 function conservativeSignal(over35, under15) {
@@ -1229,22 +1308,249 @@ function onConservChange() {
   if (typeof applyFilters === "function" && typeof allRows !== "undefined" && allRows.length) applyFilters();
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+// ── TIME-AWARE MATCH FREQUENCY SYSTEM ────────────────────────────────
+//
+// Replaces flat "last N matches" averaging with:
+//   1. Time-decay weighting  — recent matches weighted more by calendar days
+//   2. Match-congestion fatigue — teams playing 6 games in 14 days vs 2
+//   3. Rest-advantage boost  — extra days since last match = fresh legs
+//   4. Per-team adaptive window — window spans actual elapsed days, not a
+//      fixed global 30-day cap, so every team is judged on its own schedule
+//
+// All adjustments feed into attack/defence λ values only.
+// Poisson formula, BTTS, O/U, DC model, Elo — all untouched.
+// ═══════════════════════════════════════════════════════════════════════
+
+/** Global tuning constants — change here, affects the whole system. */
+const FREQ_CONFIG = {
+  alpha:      0.08,   // time-decay rate: higher → older matches fall off faster
+  beta:       0.50,   // fatigue sensitivity: reduced from 0.70 — prevents over-penalisation
+  gamma:      0.02,   // rest-boost rate per extra day beyond league average (reduced from 0.03)
+  minMatches: 3,      // below this → return low-confidence defaults
+  lambdaMin:  0.30,   // hard floor for any λ output (raised from 0.10 — 0.10 is unrealistically low)
+  lambdaMax:  4.00,   // hard ceiling for any λ output (lowered from 5.00)
+  // Clamping bounds for adjustment factors — CRITICAL for realism
+  fatigueMin: 0.80,   // fatigue factor lower bound (20% max penalty)
+  fatigueMax: 1.10,   // fatigue factor upper bound (10% max boost for fresh teams)
+  restMin:    0.95,   // rest boost lower bound (5% max penalty for no rest)
+  restMax:    1.10,   // rest boost upper bound (10% max boost for well-rested teams)
+};
+
+/**
+ * Parse a stored match date string to a JS Date.
+ * Reuses the existing parseMatchDate() already defined above.
+ * Returns null when the date is missing or unparseable.
+ */
+function _matchDate(m) {
+  if (!m.date) return null;
+  return parseMatchDate(m.date);
+}
+
+/**
+ * Days between two JS Date objects (positive = d2 is later).
+ */
+function _daysBetween(d1, d2) {
+  return (d2 - d1) / 86400000;
+}
+
+// ── STEP 4: LEAGUE FREQUENCY BASELINE ────────────────────────────────
+/**
+ * computeLeagueFreqStats(matchStore)
+ *
+ * Scans every team in the store and builds league-level norms:
+ *   avgDensity  = mean matches-per-day across all teams
+ *   avgRest     = mean days between consecutive matches across all teams
+ *
+ * These are used for fatigue and rest normalisation so that a Premier
+ * League team playing twice a week is judged against PL norms, not a
+ * La Liga team playing once a week.
+ *
+ * Returns: { avgDensity, avgRest }
+ */
+function computeLeagueFreqStats(store) {
+  let totalDensity = 0, densityCount = 0;
+  let totalRest = 0,    restCount    = 0;
+
+  for (const matches of Object.values(store)) {
+    if (matches.length < 2) continue;
+
+    // Sort ascending by date — some stores may have mixed order
+    const dated = matches
+      .map(m => ({ ...m, _d: _matchDate(m) }))
+      .filter(m => m._d && !isNaN(m._d))
+      .sort((a, b) => a._d - b._d);
+
+    if (dated.length < 2) continue;
+
+    const span = _daysBetween(dated[0]._d, dated[dated.length - 1]._d);
+    if (span <= 0) continue;
+
+    // Density: matches per day across the team's full season span
+    const density = dated.length / span;
+    totalDensity += density;
+    densityCount++;
+
+    // Rest: average gap between consecutive matches
+    for (let i = 1; i < dated.length; i++) {
+      const gap = _daysBetween(dated[i - 1]._d, dated[i]._d);
+      if (gap > 0 && gap <= 21) { // ignore >21-day gaps (international breaks etc.)
+        totalRest += gap;
+        restCount++;
+      }
+    }
+  }
+
+  return {
+    avgDensity: densityCount > 0 ? totalDensity / densityCount : 0.14,  // ~1 game/7 days fallback
+    avgRest:    restCount    > 0 ? totalRest    / restCount    : 7.0,    // 7-day fallback
+  };
+}
+
+// Module-level cache — built once per Run alongside _leagueOSIs
+let _leagueFreqStats = { avgDensity: 0.14, avgRest: 7.0 };
+
+// ── STEPS 1–7: ADJUSTED LAMBDA ────────────────────────────────────────
+/**
+ * computeAdjustedLambda(name, n)
+ *
+ * Replaces rawTeamLambda() as the primary scoring-rate estimator.
+ *
+ * Pipeline for a team's last N matches:
+ *   1. Filter out matches with no parseable date; sort descending (recent first)
+ *   2. Take up to N matches → define windowDays from newest to oldest
+ *   3. Assign each match a time-decay weight:
+ *        w_i = exp(-alpha × daysAgo_i / windowDays)
+ *      then normalise so Σw = 1
+ *   4. Compute time-weighted avgScored / avgConceded
+ *   5. Compute match density and fatigueFactor
+ *   6. Compute restBoost from days since the most recent match
+ *   7. Apply both adjustments and clamp
+ *   8. Return { scored, conceded, n, confidence, fatigueFactor, restBoost,
+ *               windowDays, density, lastRestDays }
+ *
+ * Output keys match rawTeamLambda's `scored`/`conceded`/`n` so all
+ * callers (computeOSI, adjustedTeamLambda) work without changes.
+ */
+function computeAdjustedLambda(name, n) {
+  const cfg = FREQ_CONFIG;
+  const all = getTeamMatches(name);
+
+  // ── edge case: too few matches ──────────────────────────────────────
+  if (all.length < cfg.minMatches) {
+    return {
+      scored: 1.2, conceded: 1.2,   // neutral-ish fallback
+      n: all.length,
+      confidence: 0,
+      fatigueFactor: 1.0, restBoost: 1.0,
+      windowDays: 0, density: 0, lastRestDays: 7,
+      lowConf: true
+    };
+  }
+
+  // ── STEP 10a: sort descending, skip undated ─────────────────────────
+  const now = new Date();
+  const dated = all
+    .map(m => ({ ...m, _d: _matchDate(m) }))
+    .filter(m => m._d && !isNaN(m._d) && m._d <= now)
+    .sort((a, b) => b._d - a._d);           // most recent first
+
+  if (dated.length < cfg.minMatches) {
+    return {
+      scored: 1.2, conceded: 1.2,
+      n: dated.length,
+      confidence: 0,
+      fatigueFactor: 1.0, restBoost: 1.0,
+      windowDays: 0, density: 0, lastRestDays: 7,
+      lowConf: true
+    };
+  }
+
+  // ── STEP 3: adaptive window ─────────────────────────────────────────
+  const sample = dated.slice(0, n);          // most recent N (still descending)
+  const N = sample.length;
+  const newestDate = sample[0]._d;
+  const oldestDate = sample[N - 1]._d;
+  const windowDays = Math.max(1, _daysBetween(oldestDate, newestDate));
+
+  // ── STEP 2: time-decay weights ──────────────────────────────────────
+  // daysAgo_i measured from the newest match in the window (not today),
+  // so the window is self-contained and doesn't penalise teams for
+  // a long gap before their most recent game.
+  const rawWeights = sample.map(m => {
+    const daysAgo = _daysBetween(m._d, newestDate);   // 0 for newest, positive for older
+    return Math.exp(-cfg.alpha * (daysAgo / windowDays));
+  });
+  const wSum = rawWeights.reduce((s, w) => s + w, 0) || 1;
+  const weights = rawWeights.map(w => w / wSum);
+
+  // ── time-weighted base λ ────────────────────────────────────────────
+  const baseScored   = sample.reduce((s, m, i) => s + m.scored   * weights[i], 0);
+  const baseConceded = sample.reduce((s, m, i) => s + m.conceded * weights[i], 0);
+
+  // ── STEP 5: fatigue factor ──────────────────────────────────────────
+  const density = N / windowDays;                             // matches per day
+  const avgDensity = _leagueFreqStats.avgDensity || 0.14;
+  const densityFactor = avgDensity > 0 ? density / avgDensity : 1.0;
+  // fatigueFactor < 1 when team is busier than league norm; > 1 when fresher
+  // Bounded between fatigueMin and fatigueMax to prevent extreme scaling
+  const rawFatigue = 1 / (1 + cfg.beta * (densityFactor - 1));
+  const fatigueFactor = Math.max(cfg.fatigueMin || 0.80, Math.min(cfg.fatigueMax || 1.10, rawFatigue));
+
+  // ── STEP 6: rest boost ──────────────────────────────────────────────
+  const lastRestDays = _daysBetween(newestDate, now);        // days since last match
+  const avgRest = _leagueFreqStats.avgRest || 7.0;
+  // Symmetric and bounded: max ±10% adjustment from rest
+  const rawRestBoost = 1 + cfg.gamma * (lastRestDays - avgRest);
+  const restBoost = Math.max(cfg.restMin || 0.95, Math.min(cfg.restMax || 1.10, rawRestBoost));
+
+  // ── STEP 7: apply adjustments ───────────────────────────────────────
+  // Attack suffers from fatigue AND can benefit from rest
+  // Defence suffers from fatigue (tired teams defend worse) — divide by factor
+  const adjScored   = baseScored   * fatigueFactor * restBoost;
+  const adjConceded = baseConceded / fatigueFactor;           // fatigued → leakier
+
+  // ── STEP 10d: clamp extremes ────────────────────────────────────────
+  const scored   = Math.max(cfg.lambdaMin, Math.min(cfg.lambdaMax, adjScored));
+  const conceded = Math.max(cfg.lambdaMin, Math.min(cfg.lambdaMax, adjConceded));
+
+  // ── confidence: how much did adjustments move the base? ─────────────
+  const attackDrift  = baseScored   > 0 ? Math.abs(scored   - baseScored)   / baseScored   : 0;
+  const defenceDrift = baseConceded > 0 ? Math.abs(conceded - baseConceded) / baseConceded : 0;
+  const confidence   = Math.max(0, 1 - (attackDrift + defenceDrift) / 2);
+
+  return {
+    scored:   +scored.toFixed(4),
+    conceded: +conceded.toFixed(4),
+    n: N,
+    confidence: +confidence.toFixed(4),
+    fatigueFactor: +fatigueFactor.toFixed(4),
+    restBoost:     +restBoost.toFixed(4),
+    windowDays:    +windowDays.toFixed(1),
+    density:       +density.toFixed(4),
+    lastRestDays:  +lastRestDays.toFixed(1),
+    // preserve base values for debug / drawer display
+    baseScored:   +baseScored.toFixed(4),
+    baseConceded: +baseConceded.toFixed(4),
+    lowConf: false
+  };
+}
+
+// ── BACKWARD-COMPATIBLE rawTeamLambda ────────────────────────────────
+/**
+ * rawTeamLambda — kept for computeOSI() which needs a plain average
+ * (opponent strength is intentionally unweighted to avoid recursion).
+ * Now delegates to computeAdjustedLambda so OSI also benefits from
+ * time-decay while staying single-stage with no opponent chains.
+ */
+function rawTeamLambda(name, n) {
+  const r = computeAdjustedLambda(name, n);
+  return { scored: r.scored, conceded: r.conceded, n: r.n };
+}
+
 // ── ONE-STAGE OPPONENT-STRENGTH NORMALIZATION ──
 // Rules: no recursion, no opponent chains,
 //        opponent stats are always raw, last N only.
-
-/** Raw λ for a team — plain average, no weighting */
-function rawTeamLambda(name,n){
-  const all=getTeamMatches(name);
-  if(!all.length)return{scored:0,conceded:0,n:0};
-  const sample=all.slice(-n);
-  const N=sample.length;
-  return{
-    scored:  sample.reduce((s,m)=>s+m.scored,   0)/N,
-    conceded:sample.reduce((s,m)=>s+m.conceded, 0)/N,
-    n:N
-  };
-}
 
 /**
  * OSI (Opponent Strength Index) — ONE-STAGE, uses raw lambdas only.
@@ -1363,18 +1669,23 @@ function buildTeamRatings(n, leagueParams, alpha=1.0) {
         if (count > 0) ct[divName(sh)] = (ct[divName(sh)]||0) + count;
       }
       const topLeague = Object.entries(ct).sort((a,b) => b[1]-a[1])[0];
-      if (!topLeague) return { lp: null, name: null };
-      return { lp: leagueParams[topLeague[0]] || null, name: topLeague[0] };
+      if (!topLeague) return null;
+      return leagueParams[topLeague[0]] || null;
     })();
 
-    const avgS = leagueAvg.lp ? leagueAvg.lp.avgScored : 1.35;  // fallback to typical avg
-    const attackRating  = avgS > 0 ? avgScored   / avgS : 1.0;
-    const defenceRating = avgS > 0 ? avgConceded / avgS : 1.0;
+    const avgS = leagueAvg ? leagueAvg.avgScored : 1.35;  // fallback to typical avg
+    // Guard: prevent NaN if avgS is 0 or non-finite
+    const safeAvgS = (isFinite(avgS) && avgS > 0) ? avgS : 1.35;
+    const rawAttack  = isFinite(avgScored)   && avgScored   >= 0 ? avgScored   / safeAvgS : 1.0;
+    const rawDefence = isFinite(avgConceded) && avgConceded >= 0 ? avgConceded / safeAvgS : 1.0;
+    // Clamp ratings to prevent extreme values from distorting lambdas
+    const attackRating  = Math.max(0.2, Math.min(3.0, rawAttack));
+    const defenceRating = Math.max(0.2, Math.min(3.0, rawDefence));
 
     ratings[teamKey] = {
       attackRating:  +attackRating.toFixed(4),
       defenceRating: +defenceRating.toFixed(4),
-      league: leagueAvg.name || 'unknown'
+      league: leagueAvg ? Object.entries({}).toString() : 'unknown'
     };
   }
   return ratings;
@@ -1389,39 +1700,31 @@ function buildTeamRatings(n, leagueParams, alpha=1.0) {
 function dcLambda(homeKey, awayKey, league) {
   const hRating = _teamRatings[homeKey];
   const aRating = _teamRatings[awayKey];
-  let lp = _leagueParams[league];
-
-  // No shared league param found — blend each team's own domestic league params
-  if (!lp) {
-    const hLeague = hRating ? hRating.league : null;
-    const aLeague = aRating ? aRating.league : null;
-    const hLP = hLeague ? _leagueParams[hLeague] : null;
-    const aLP = aLeague ? _leagueParams[aLeague] : null;
-    if (hLP && aLP) {
-      // Average the two league contexts
-      lp = {
-        avgScored:     (hLP.avgScored + aLP.avgScored) / 2,
-        homeAdvFactor: (hLP.homeAdvFactor + aLP.homeAdvFactor) / 2,
-        awayAdvFactor: (hLP.awayAdvFactor + aLP.awayAdvFactor) / 2,
-      };
-    } else if (hLP) {
-      lp = hLP;
-    } else if (aLP) {
-      lp = aLP;
-    }
-  }
+  const lp      = _leagueParams[league];
 
   if (!hRating || !aRating || !lp) return null;
 
-  const avgS = lp.avgScored;
-  const lambdaHome = hRating.attackRating * aRating.defenceRating * avgS * lp.homeAdvFactor;
-  const lambdaAway = aRating.attackRating * hRating.defenceRating * avgS * lp.awayAdvFactor;
+  // Guard: attack/defence ratings must be finite and positive
+  const hAtk = isFinite(hRating.attackRating)  && hRating.attackRating  > 0 ? hRating.attackRating  : 1.0;
+  const aDef = isFinite(aRating.defenceRating) && aRating.defenceRating > 0 ? aRating.defenceRating : 1.0;
+  const aAtk = isFinite(aRating.attackRating)  && aRating.attackRating  > 0 ? aRating.attackRating  : 1.0;
+  const hDef = isFinite(hRating.defenceRating) && hRating.defenceRating > 0 ? hRating.defenceRating : 1.0;
+
+  const avgS = isFinite(lp.avgScored) && lp.avgScored > 0 ? lp.avgScored : 1.35;
+  const hAdv = isFinite(lp.homeAdvFactor) ? lp.homeAdvFactor : 1.0;
+  const aAdv = isFinite(lp.awayAdvFactor) ? lp.awayAdvFactor : 1.0;
+
+  const lambdaHome = hAtk * aDef * avgS * hAdv;
+  const lambdaAway = aAtk * hDef * avgS * aAdv;
+
+  // Guard: clamp to realistic football goal-rate range [0.3, 4.0]
+  const clamp = v => Math.max(0.3, Math.min(4.0, v));
 
   return {
-    lambdaHome: +Math.max(0.1, lambdaHome).toFixed(4),
-    lambdaAway: +Math.max(0.1, lambdaAway).toFixed(4),
-    homeAdvFactor: +lp.homeAdvFactor.toFixed(4),
-    awayAdvFactor: +lp.awayAdvFactor.toFixed(4),
+    lambdaHome: +clamp(lambdaHome).toFixed(4),
+    lambdaAway: +clamp(lambdaAway).toFixed(4),
+    homeAdvFactor: +hAdv.toFixed(4),
+    awayAdvFactor: +aAdv.toFixed(4),
     leagueAvg:     +avgS.toFixed(4)
   };
 }
@@ -1436,12 +1739,15 @@ function dcLambda(homeKey, awayKey, league) {
  * alpha=0.70 → strong recency emphasis
  */
 function decayWeights(N, alpha) {
+  if (N <= 0) return [];
   if (alpha >= 0.999) {
     // uniform — avoid tiny float drift
     return Array(N).fill(1/N);
   }
   const raw = Array.from({length: N}, (_, i) => Math.pow(alpha, N - 1 - i));
   const sum = raw.reduce((s,w) => s+w, 0);
+  // Guard: if sum is 0 or non-finite, fall back to uniform weights
+  if (!sum || !isFinite(sum)) return Array(N).fill(1/N);
   return raw.map(w => w/sum);
 }
 
@@ -1492,9 +1798,14 @@ function adjustedTeamLambda(name,n,leagueOSIs,alpha=1.0){
   // Combined weight = OSI weight × decay weight, then normalise
   const combined=mwfs.map((mwf,i)=>mwf*dw[i]);
   const wSum=combined.reduce((s,w)=>s+w,0)||1;
+  const scored   = sample.reduce((s,m,i)=>s+m.scored   *combined[i],0)/wSum;
+  const conceded = sample.reduce((s,m,i)=>s+m.conceded *combined[i],0)/wSum;
+  // Guard: clamp and check for NaN
+  const safeScored   = isFinite(scored)   ? Math.max(0.3, Math.min(4.0, scored))   : 1.2;
+  const safeConceded = isFinite(conceded) ? Math.max(0.3, Math.min(4.0, conceded)) : 1.2;
   return{
-    scored:  sample.reduce((s,m,i)=>s+m.scored   *combined[i],0)/wSum,
-    conceded:sample.reduce((s,m,i)=>s+m.conceded *combined[i],0)/wSum,
+    scored:   +safeScored.toFixed(4),
+    conceded: +safeConceded.toFixed(4),
     n:N,
     mwfs
   };
@@ -1553,25 +1864,36 @@ let _eloRatings = new Map();  // populated at Run time
 /**
  * Elo win probability for home team.
  * Returns { homeWin, draw, awayWin, homeElo, awayElo }
+ *
+ * DESIGN: Elo is restricted STRICTLY to W/D/L probabilities.
+ * It does NOT influence BTTS directly. BTTS is computed purely from
+ * Poisson lambdas with Dixon-Coles rho correction.
+ *
+ * Draw model: P(draw) peaks at ~0.28 when teams are equally matched
+ * and decays as the Elo gap widens.
  */
 function eloMatchProb(homeKey, awayKey) {
   const rH = _eloRatings.get(homeKey) || ELO_BASE;
   const rA = _eloRatings.get(awayKey) || ELO_BASE;
+
+  // Standard Elo expected score for home team
   const eH = 1 / (1 + Math.pow(10, (rA - rH) / 400));
-  // Distribute Elo probability to W/D/L:
-  // draw probability peaks when teams are equal, modelled as bell around 0.5
-  const diff = Math.abs(eH - 0.5);
-  const drawP = Math.max(0.10, 0.30 - diff * 0.8);
-  const winP  = eH - drawP / 2;
-  const lossP = 1 - winP - drawP;
-  // BTTS pressure: stronger favourite → higher scoring attacker vs weaker defence
-  // Simplified: BTTS Elo factor = 0.5 + 0.4*(1 - |eH-0.5|*2)
-  const bttsFactor = 0.5 + 0.4 * (1 - Math.min(1, diff * 2));
+
+  // Draw probability peaks at 0.28 for equal teams, decays with gap
+  const gap = Math.abs(eH - 0.5);
+  const drawP = Math.max(0.08, Math.min(0.30, 0.28 - 0.60 * gap * gap * 4));
+
+  // Win/loss split remaining probability proportionally
+  const remaining = 1 - drawP;
+  const winP  = eH * remaining;
+  const lossP = remaining - winP;
+
+  // Normalise to sum exactly to 1
+  const total = winP + drawP + lossP;
   return {
-    homeWin: Math.max(0.01, winP),
-    draw: Math.max(0.05, drawP),
-    awayWin: Math.max(0.01, lossP),
-    btts: +bttsFactor.toFixed(4),
+    homeWin: +Math.max(0.02, winP  / total).toFixed(4),
+    draw:    +Math.max(0.08, drawP / total).toFixed(4),
+    awayWin: +Math.max(0.02, lossP / total).toFixed(4),
     homeElo: +rH.toFixed(1),
     awayElo: +rA.toFixed(1),
     eloDiff: +(rH - rA).toFixed(1)
@@ -1584,66 +1906,259 @@ function eloMatchProb(homeKey, awayKey) {
 // Uses last N matches only; no historical seasons.
 // ═══════════════════════════════════════════════════════════════════════
 
+/** Minimum sample size for reliable form regression */
+const FORM_MIN_SAMPLE = 4;
+
+/** Shrinkage coefficient: how much to pull estimates toward the mean.
+ *  Higher = more shrinkage for small samples. Range [0, 1]. */
+const FORM_SHRINKAGE_K = 5; // pseudo-count of "average" matches added
+
+/**
+ * Shrink a value toward a prior mean using James-Stein style shrinkage.
+ * shrunk = (n·value + k·prior) / (n + k)
+ * where k = FORM_SHRINKAGE_K, prior = grand mean of the metric.
+ */
+function shrinkToward(value, n, prior) {
+  const k = FORM_SHRINKAGE_K;
+  return (n * value + k * prior) / (n + k);
+}
+
 /**
  * Compute trend stats for a team's last N matches.
  * Performance metric per match = scored - conceded (goal difference).
  * Returns: slope, acceleration, momentum, volatility, trend direction.
- * No recursion. Pure linear regression on time series.
+ *
+ * Improvements vs original:
+ *   - Minimum sample size guard (returns neutral defaults if too few matches)
+ *   - Slope shrinkage toward 0 (the prior: no trend) using sample size
+ *   - Acceleration bounded by sample availability (needs N≥4)
+ *   - bttsFactor: purely from Poisson average goals, NOT from slope
+ *     (slope is a trend signal, not a goals-rate signal)
+ *   - Volatility uses Bessel-corrected std for small samples
  */
 function formTrendStats(name, n, alpha=1.0) {
   const all = getTeamMatches(name);
-  if (all.length < 2) return { slope: 0, accel: 0, momentum: 0, volatility: 1, trend: 'neutral', bttsFactor: 0.5 };
+
+  // Return neutral defaults if too few matches — avoids spurious slope/accel
+  if (all.length < FORM_MIN_SAMPLE) {
+    return { slope: 0, accel: 0, momentum: 0, volatility: 1, trend: 'neutral', bttsFactor: 0.5, lowConf: true };
+  }
+
   const sample = all.slice(-n);
   const N = sample.length;
   const dw = decayWeights(N, alpha);
 
-  // Performance score per match: goals scored weighted up, conceded weighted down
+  // Performance score per match
   const perf = sample.map(m => m.scored - 0.7 * m.conceded);
 
-  // Decay-weighted mean for regression
+  // Decay-weighted mean for regression anchor
   const yMean = perf.reduce((s,v,i) => s + v * dw[i], 0);
   const xMean = (N - 1) / 2;
+
+  // OLS slope on uniformly-spaced time index (i = 0..N-1)
   let num = 0, den = 0;
   for (let i = 0; i < N; i++) {
     num += (i - xMean) * (perf[i] - yMean);
     den += (i - xMean) ** 2;
   }
-  const slope = den > 0 ? num / den : 0;
+  const rawSlope = den > 0 ? num / den : 0;
 
-  // Acceleration: slope of second half vs first half
-  const mid = Math.floor(N / 2);
-  const firstHalf = perf.slice(0, mid);
-  const secondHalf = perf.slice(mid);
-  const avgFirst  = firstHalf.reduce((s,v)=>s+v,0) / (firstHalf.length||1);
-  const avgSecond = secondHalf.reduce((s,v)=>s+v,0) / (secondHalf.length||1);
-  const accel = avgSecond - avgFirst;
+  // Shrink slope toward 0 (prior: no trend) — prevents instability with small N
+  // The more matches we have, the less we shrink
+  const slope = shrinkToward(rawSlope, N, 0);
 
-  // Momentum: last 3 matches (already most recent = highest index)
+  // Acceleration: only reliable with N ≥ 4; otherwise set to 0
+  let accel = 0;
+  if (N >= 4) {
+    const mid = Math.floor(N / 2);
+    const firstHalf  = perf.slice(0, mid);
+    const secondHalf = perf.slice(mid);
+    const avgFirst   = firstHalf.reduce((s,v)=>s+v,0) / firstHalf.length;
+    const avgSecond  = secondHalf.reduce((s,v)=>s+v,0) / secondHalf.length;
+    const rawAccel   = avgSecond - avgFirst;
+    // Shrink acceleration too; bound to prevent extreme swings
+    accel = Math.max(-2, Math.min(2, shrinkToward(rawAccel, N, 0)));
+  }
+
+  // Momentum: weighted average of last 3 matches by recency
   const recent = sample.slice(-Math.min(3, N));
-  const momentum = recent.reduce((s, m, i) => s + m.scored * (i + 1), 0) /
-                   recent.reduce((_, __, i) => _ + (i + 1), 0) || 0;
+  const mWeights = recent.map((_, i) => i + 1);
+  const mWsum = mWeights.reduce((s,w)=>s+w,0);
+  const momentum = recent.reduce((s,m,i) => s + m.scored * mWeights[i], 0) / mWsum;
 
-  // Volatility: decay-weighted standard deviation
-  const variance = perf.reduce((s, v, i) => s + dw[i] * (v - yMean) ** 2, 0);
-  const volatility = Math.sqrt(variance);
+  // Volatility: Bessel-corrected (N-1) weighted standard deviation
+  // Use unweighted for simplicity; volatility is a stability signal not a precise stat
+  const denom = N > 1 ? N - 1 : 1;
+  const meanPerf = perf.reduce((s,v)=>s+v,0) / N;
+  const variance = perf.reduce((s,v) => s + (v - meanPerf)**2, 0) / denom;
+  const volatility = Math.sqrt(Math.max(0, variance));
 
   const trend = slope > 0.15 ? 'rising' : slope < -0.15 ? 'falling' : 'neutral';
 
-  // BTTS form factor — decay-weighted avg scored/conceded
+  // bttsFactor: derived ONLY from average goals scored/conceded, NOT from slope.
+  // Slope is a trend signal; goals rate is what drives BTTS probability.
+  // Formula: base 0.3 + scoring component (0 to 0.35) + conceding component (0 to 0.35)
   const avgScored   = sample.reduce((s,m,i) => s + m.scored   * dw[i], 0);
   const avgConceded = sample.reduce((s,m,i) => s + m.conceded * dw[i], 0);
-  const bttsFactor = Math.min(0.95, Math.max(0.05,
-    0.3 + 0.25 * Math.min(1, avgScored / 2) + 0.25 * Math.min(1, avgConceded / 2) + 0.2 * Math.max(0, slope * 0.3)
+  // Shrink both toward league average (≈1.3 goals)
+  const shrunkScored   = shrinkToward(avgScored,   N, 1.3);
+  const shrunkConceded = shrinkToward(avgConceded, N, 1.3);
+  const bttsFactor = Math.min(0.92, Math.max(0.08,
+    0.3 + 0.35 * Math.min(1, shrunkScored / 2) + 0.35 * Math.min(1, shrunkConceded / 2)
   ));
 
   return {
-    slope: +slope.toFixed(4),
-    accel: +accel.toFixed(4),
-    momentum: +momentum.toFixed(4),
+    slope:      +slope.toFixed(4),
+    accel:      +accel.toFixed(4),
+    momentum:   +momentum.toFixed(4),
     volatility: +volatility.toFixed(4),
     trend,
-    bttsFactor: +bttsFactor.toFixed(4)
+    bttsFactor: +bttsFactor.toFixed(4),
+    lowConf: N < FORM_MIN_SAMPLE
   };
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// ── DIXON-COLES RHO CORRECTION & CORRELATION-AWARE BTTS ───────────────
+//
+// Dixon-Coles (1997) correction applies only to low-score cells:
+//   τ(x, y, λ, μ, ρ) = {
+//     1 − λμρ          if x=0, y=0
+//     1 + λρ           if x=0, y=1
+//     1 + μρ           if x=1, y=0
+//     1 − ρ            if x=1, y=1
+//     1                otherwise
+//   }
+//
+// BTTS = P(home ≥ 1) ∧ P(away ≥ 1)
+//      = 1 − P(home=0) − P(away=0) + P(home=0, away=0)
+//
+// With DC correction the joint probability P(x,y) is:
+//   P(x,y) = Poisson(x|λ) · Poisson(y|μ) · τ(x, y, λ, μ, ρ)
+//
+// So the DC-adjusted P(0,0) changes, which changes BTTS.
+// ρ is typically negative (−0.13 is the original DC estimate) meaning
+// 0-0 draws are less likely than independent Poisson implies.
+//
+// ρ is bounded ∈ (−1/λμ, 1/max(λ,μ)) to keep τ values in (0, ∞).
+// ═══════════════════════════════════════════════════════════════════════
+
+/** Clamp rho to a valid range given lambdaHome, lambdaAway */
+function clampRho(rho, lH, lA) {
+  if (!isFinite(lH) || !isFinite(lA) || lH <= 0 || lA <= 0) return 0;
+  const loBound = -1 / (lH * lA);       // keeps τ(0,0) > 0
+  const hiBound =  1 / Math.max(lH, lA); // keeps all τ values positive
+  return Math.max(loBound + 1e-6, Math.min(hiBound - 1e-6, rho));
+}
+
+/**
+ * Poisson PMF: P(X = k | lambda)
+ * Uses log-space for numerical stability at large k.
+ */
+function poissonPMF(k, lambda) {
+  if (lambda <= 0 || k < 0 || !isFinite(lambda)) return k === 0 ? 1 : 0;
+  // Use log-gamma for stability
+  let logP = k * Math.log(lambda) - lambda;
+  for (let i = 1; i <= k; i++) logP -= Math.log(i); // subtract log(k!)
+  return Math.exp(logP);
+}
+
+/**
+ * Dixon-Coles τ correction factor for low-score cells.
+ * τ(x, y, λ, μ, ρ)
+ */
+function dcTau(x, y, lH, lA, rho) {
+  if (x === 0 && y === 0) return 1 - lH * lA * rho;
+  if (x === 0 && y === 1) return 1 + lH * rho;
+  if (x === 1 && y === 0) return 1 + lA * rho;
+  if (x === 1 && y === 1) return 1 - rho;
+  return 1;
+}
+
+/**
+ * Compute BTTS probability with full Dixon-Coles rho correction.
+ *
+ * Method: enumerate joint probabilities for low-score outcomes that
+ * affect BTTS, then compute remainder analytically.
+ *
+ * BTTS = 1 − P(H=0) − P(A=0) + P(H=0,A=0)
+ *
+ * The DC correction modifies P(0,0), P(0,1), P(1,0), P(1,1).
+ * P(H=0) = P(0,0) + P(0,1) + P(0,2) + ... (all corrected for x=0 cells)
+ * But only (0,0) and (0,1) receive DC correction; (0,y≥2) use raw Poisson.
+ *
+ * Full formula:
+ *   P(H=0) corrected = Σ_{y≥0} Poisson(0|λ)·Poisson(y|μ)·τ(0,y,λ,μ,ρ)
+ *                    = Poisson(0|λ) · [Poisson(0|μ)·τ(0,0) + Poisson(1|μ)·τ(0,1) + Σ_{y≥2} Poisson(y|μ)]
+ *                    = Poisson(0|λ) · [Poisson(0|μ)·(1−λμρ) + Poisson(1|μ)·(1+λρ) + (1−Poisson(0|μ)−Poisson(1|μ))]
+ *
+ * @param {number} lH - Home expected goals (lambda)
+ * @param {number} lA - Away expected goals (mu)
+ * @param {number} [rho=-0.13] - DC correlation parameter
+ * @returns {number} BTTS probability ∈ [0, 1]
+ */
+function dcBTTS(lH, lA, rho = -0.13) {
+  // Guard: invalid lambdas
+  if (!isFinite(lH) || !isFinite(lA) || lH <= 0 || lA <= 0) return null;
+
+  // Clamp rho to valid range
+  const r = clampRho(rho, lH, lA);
+
+  // Raw Poisson marginals
+  const p0H = Math.exp(-lH);          // P(H=0)
+  const p1H = lH * Math.exp(-lH);     // P(H=1)
+  const p0A = Math.exp(-lA);          // P(A=0)
+  const p1A = lA * Math.exp(-lA);     // P(A=1)
+
+  // DC-corrected joint low-score probabilities
+  const p00 = p0H * p0A * dcTau(0, 0, lH, lA, r);  // 0-0
+  const p01 = p0H * p1A * dcTau(0, 1, lH, lA, r);  // 0-1
+  const p10 = p1H * p0A * dcTau(1, 0, lH, lA, r);  // 1-0
+  const p11 = p1H * p1A * dcTau(1, 1, lH, lA, r);  // 1-1
+
+  // P(H=0) with DC correction on y=0 and y=1 cells; y≥2 are raw Poisson
+  // Σ_{y≥2} Poisson(y|lA) = 1 - p0A - p1A
+  const pH0_corrected = p00 + p01 + p0H * (1 - p0A - p1A);
+
+  // P(A=0) with DC correction on x=0 and x=1 cells; x≥2 are raw Poisson
+  const pA0_corrected = p00 + p10 + p0A * (1 - p0H - p1H);
+
+  // DC-corrected P(H=0, A=0) = p00 (already computed)
+  // BTTS = 1 - P(H=0) - P(A=0) + P(H=0,A=0)  [inclusion-exclusion]
+  const btts = 1 - pH0_corrected - pA0_corrected + p00;
+
+  // Clamp to valid probability
+  return Math.max(0, Math.min(1, btts));
+}
+
+/**
+ * Estimate rho from data.
+ * Simple data-driven approach: if low-scoring matches are less common
+ * than Poisson predicts, rho is negative (the typical football finding).
+ * Falls back to DC original estimate of −0.13 when insufficient data.
+ *
+ * @param {Array} matches - Array of {hg, ag} match objects
+ * @returns {number} Estimated rho
+ */
+function estimateRho(matches) {
+  if (!matches || matches.length < 20) return -0.13; // DC original estimate
+  const n = matches.length;
+  let sumLH = 0, sumLA = 0, count00 = 0;
+  for (const m of matches) {
+    const hg = parseFloat(m.hg), ag = parseFloat(m.ag);
+    if (isNaN(hg) || isNaN(ag)) continue;
+    sumLH += hg; sumLA += ag;
+    if (hg === 0 && ag === 0) count00++;
+  }
+  const lH = sumLH / n, lA = sumLA / n;
+  // Expected 0-0 under independence: exp(-lH-lA)
+  const expected00 = Math.exp(-lH - lA) * n;
+  if (expected00 <= 0) return -0.13;
+  // If observed 0-0 < expected, rho is negative
+  const ratio = count00 / expected00;
+  // Map ratio to rho: ratio=1 → rho=0, ratio<1 → negative rho
+  const rawRho = (ratio - 1) / (lH * lA);
+  return Math.max(-0.25, Math.min(0.0, rawRho)); // keep rho ≤ 0 (football finding)
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -1658,7 +2173,8 @@ function getWeights() {
   const p  = parseInt(document.getElementById('wPoisson')?.value || 50);
   const e  = parseInt(document.getElementById('wElo')?.value     || 30);
   const f  = parseInt(document.getElementById('wForm')?.value    || 20);
-  const total = p + e + f || 100;
+  // Guard: ensure total > 0 to avoid division by zero
+  const total = Math.max(1, p + e + f);
   return { wPoisson: p/total, wElo: e/total, wForm: f/total };
 }
 
@@ -1667,37 +2183,68 @@ function getConfWeights() {
   const b = parseInt(document.getElementById('cBeta')?.value  || 30);
   const g = parseInt(document.getElementById('cGamma')?.value || 20);
   const d = parseInt(document.getElementById('cDelta')?.value || 15);
-  const total = a + b + g + d || 100;
+  const total = Math.max(1, a + b + g + d);
   return { alpha: a/total, beta: b/total, gamma: g/total, delta: d/total };
 }
 
 /**
  * Ensemble BTTS fusion.
- * Poisson output: probability [0,1]
- * Elo output: bttsFactor [0,1] (pressure factor)
- * Form output: bttsFactor [0,1] (momentum factor)
+ *
+ * DESIGN: Elo is EXCLUDED from BTTS fusion. Elo models W/D/L outcomes
+ * (match result), NOT scoring rates. BTTS depends on both teams scoring,
+ * which is a function of goal-rate models (Poisson) and form trends.
+ *
+ * Weights are renormalised between Poisson and Form only for BTTS.
+ * The wElo slider still influences 1X2 outcomes via fuseOutcomes().
+ *
+ * @param {number} poissonBTTS - DC-corrected Poisson BTTS probability
+ * @param {number} formBTTS    - Form-based BTTS factor
+ * @param {Object} w           - Normalised weight object {wPoisson, wElo, wForm}
+ * @returns {number|null}
  */
-function fuseBTTS(poissonBTTS, eloBTTS, formBTTS, w) {
-  if (poissonBTTS === null) return null;
-  const raw = w.wPoisson * poissonBTTS + w.wElo * eloBTTS + w.wForm * formBTTS;
+function fuseBTTS(poissonBTTS, formBTTS, w) {
+  if (poissonBTTS === null || !isFinite(poissonBTTS)) return null;
+  if (formBTTS    === null || !isFinite(formBTTS))    return poissonBTTS;
+
+  // Renormalise Poisson + Form weights (exclude Elo entirely for BTTS)
+  const wP = w.wPoisson, wF = w.wForm;
+  const bttsTotal = wP + wF;
+  if (bttsTotal <= 0) return poissonBTTS;
+
+  const raw = (wP * poissonBTTS + wF * formBTTS) / bttsTotal;
+
+  // Guard: clamp to valid probability
   return Math.min(0.99, Math.max(0.01, raw));
 }
 
 /**
  * Ensemble 1X2 outcome probabilities.
- * Poisson gives a BTTS-only model; for 1X2 we use Elo as primary,
- * modulated by form slope signal.
+ * Elo provides calibrated 1X2; Form provides adjustment multiplier.
+ * Poisson does not provide 1X2 directly; we rely on Elo for this.
  */
-function fuseOutcomes(poissonBTTS, eloProbs, formStats, w) {
+function fuseOutcomes(eloProbs, formStats, w) {
   if (!eloProbs) return null;
-  // Poisson doesn't natively give 1X2; proxy from expected goals ratio via lambda
-  // Elo provides calibrated 1X2; Form provides adjustment multiplier
-  const formMult = 1 + formStats.slope * 0.15;  // rising form increases win probability slightly
-  const hw = Math.min(0.92, Math.max(0.02, eloProbs.homeWin * (1 + w.wForm * (formMult - 1))));
-  const aw = Math.min(0.92, Math.max(0.02, eloProbs.awayWin));
+
+  // Form slope adjusts home win probability slightly
+  // Bound slope influence to ±15% of base probability
+  const slopeAdj = Math.max(-0.10, Math.min(0.10, (formStats?.slope || 0) * 0.12));
+  const formMult = 1 + w.wForm * slopeAdj;
+
+  const hw = eloProbs.homeWin * formMult;
+  const aw = eloProbs.awayWin;
   const dr = Math.max(0.05, 1 - hw - aw);
   const total = hw + dr + aw;
-  return { hw: hw/total, draw: dr/total, aw: aw/total };
+
+  // Guard against NaN/Infinity before division
+  if (!isFinite(total) || total <= 0) {
+    return { hw: eloProbs.homeWin, draw: eloProbs.draw, aw: eloProbs.awayWin };
+  }
+
+  return {
+    hw:   Math.max(0.02, Math.min(0.92, hw   / total)),
+    draw: Math.max(0.05, Math.min(0.92, dr   / total)),
+    aw:   Math.max(0.02, Math.min(0.92, aw   / total))
+  };
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -1719,14 +2266,15 @@ function calcConfidence(H, A, poissonBTTS, ensBTTS, eloProbs, formH, formA, cw) 
   const foundBonus = (H.found && A.found) ? 1 : 0.3;
   const dataQuality = sampleQ * foundBonus;
 
-  // B) Model agreement — how close are Poisson, Elo, Form BTTS estimates?
-  const poisV = poissonBTTS || 0.5;
-  const eloV  = eloProbs ? eloProbs.btts : 0.5;
+  // B) Model agreement — how close are Poisson and Form BTTS estimates?
+  // NOTE: Elo is excluded from BTTS agreement (Elo is W/D/L only by design)
+  const poisV = (poissonBTTS !== null && isFinite(poissonBTTS)) ? poissonBTTS : 0.5;
   const formV = formH ? (formH.bttsFactor + formA.bttsFactor) / 2 : 0.5;
-  const vals  = [poisV, eloV, formV];
-  const meanV = vals.reduce((s,v)=>s+v,0)/3;
-  const spread = Math.sqrt(vals.reduce((s,v)=>s+(v-meanV)**2,0)/3);
-  const modelAgreement = Math.max(0, 1 - spread * 4);  // spread of 0.25 → 0
+  const vals  = [poisV, formV];
+  const meanV = vals.reduce((s,v)=>s+v,0)/vals.length;
+  const spread = Math.sqrt(vals.reduce((s,v)=>s+(v-meanV)**2,0)/vals.length);
+  // spread of 0.20 → 0 confidence; scaled to be realistic for 2-model agreement
+  const modelAgreement = Math.max(0, 1 - spread * 5);
 
   // C) Signal strength — distance from 50% neutrality
   const signal = ensBTTS !== null ? ensBTTS : poissonBTTS || 0.5;
@@ -1804,22 +2352,38 @@ function teamStats(name,n,alpha=1.0){
   const N=sample.length;
   const dw=decayWeights(N,alpha); // normalised weights, most recent = highest
 
-  // ── raw λ — decay-weighted ──
+  // ── raw λ — index-decay-weighted (kept for OSI/adj pipeline) ──
   const lS_raw=sample.reduce((s,m,i)=>s+m.scored  *dw[i],0);
   const lC_raw=sample.reduce((s,m,i)=>s+m.conceded*dw[i],0);
   // totS/totC kept as raw counts for display purposes
   const totS=sample.reduce((s,m)=>s+m.scored,0);
   const totC=sample.reduce((s,m)=>s+m.conceded,0);
 
-  // ── adjusted λ (one-stage OSI) with decay ──
+  // ── OSI-adjusted λ (one-stage opponent-strength) with decay ──
   const adjL=adjustedTeamLambda(name,n,_leagueOSIs,alpha);
   const lS_adj=adjL.scored, lC_adj=adjL.conceded;
 
-  // ── pick active λ based on mode ──
-  const lS = osiMode==='raw' ? lS_raw : lS_adj;
-  const lC = osiMode==='raw' ? lC_raw : lC_adj;
+  // ── time-frequency-adjusted λ (fatigue + rest) ──
+  const freqL = computeAdjustedLambda(name, n);
+  const lS_freq = freqL.scored;
+  const lC_freq = freqL.conceded;
 
-  const btts=(1-Math.exp(-lS))*(1-Math.exp(-lC));
+  // ── pick active λ based on mode ──
+  // In 'raw' mode: use freq-adjusted (time-aware but no OSI)
+  // In 'adj' mode: blend freq + OSI adjustments
+  // In 'both' mode: show raw alongside OSI-adj (freq always applied to raw)
+  const lS = osiMode==='raw'  ? lS_freq
+           : osiMode==='adj'  ? Math.min(FREQ_CONFIG.lambdaMax, Math.max(FREQ_CONFIG.lambdaMin,
+               (lS_adj * freqL.fatigueFactor * freqL.restBoost)))
+           : lS_raw; // 'both' — raw column stays as index-decay only for comparison
+  const lC = osiMode==='raw'  ? lC_freq
+           : osiMode==='adj'  ? Math.min(FREQ_CONFIG.lambdaMax, Math.max(FREQ_CONFIG.lambdaMin,
+               (lC_adj / freqL.fatigueFactor)))
+           : lC_raw;
+
+  // Individual team BTTS (marginal — how often does THIS team score AND concede?)
+  // Use DC-corrected formula: assumes symmetric opponent with same lambda
+  const btts = dcBTTS(lS, lC, -0.13);
   const cs=sample.filter(m=>m.conceded===0).length;
   const fts=sample.filter(m=>m.scored===0).length;
   const usedStart=all.length-n;
@@ -1835,6 +2399,15 @@ function teamStats(name,n,alpha=1.0){
     lS:+lS.toFixed(4),   lC:+lC.toFixed(4),
     lS_raw:+lS_raw.toFixed(4), lC_raw:+lC_raw.toFixed(4),
     lS_adj:+lS_adj.toFixed(4), lC_adj:+lC_adj.toFixed(4),
+    lS_freq:+lS_freq.toFixed(4), lC_freq:+lC_freq.toFixed(4),
+    // freq-adjustment metadata (surfaced to drawer)
+    fatigueFactor: freqL.fatigueFactor,
+    restBoost:     freqL.restBoost,
+    windowDays:    freqL.windowDays,
+    density:       freqL.density,
+    lastRestDays:  freqL.lastRestDays,
+    freqConfidence:freqL.confidence,
+    freqLowConf:   freqL.lowConf,
     attackRating:  dcRating?dcRating.attackRating:null,
     defenceRating: dcRating?dcRating.defenceRating:null,
     osiMode,
@@ -1853,7 +2426,7 @@ function computeFormScores(results){
 }
 function calcForm(t,mx){return+((Math.min(1,t.lS/mx)*.60+(t.cs/t.N)*.40)*100).toFixed(1);}
 
-function calcFixture(league,home,away,n,alpha=1.0){
+function calcFixture(league,home,away,n,alpha=1.0,meta={}){
   const H=teamStats(home,n,alpha),A=teamStats(away,n,alpha);
 
   // ── Dixon-Coles λ (attack/defence + home advantage) ──
@@ -1863,17 +2436,36 @@ function calcFixture(league,home,away,n,alpha=1.0){
     : null;
 
   // If DC model available, use its λ as the primary scoring rate
-  // otherwise fall back to raw teamStats lS
+  // otherwise fall back to time-frequency-adjusted teamStats lS
   const hLamDC = dcL ? dcL.lambdaHome : (H.found ? H.lS : null);
   const aLamDC = dcL ? dcL.lambdaAway : (A.found ? A.lS : null);
 
-  // Poisson BTTS — use DC λ when available, otherwise existing lS
-  const mBTTS=(hLamDC!==null&&aLamDC!==null)
-    ?+((1-Math.exp(-hLamDC))*(1-Math.exp(-aLamDC))).toFixed(4):null;
-  const mBTTS_raw=(H.found&&A.found)?+((1-Math.exp(-H.lS_raw))*(1-Math.exp(-A.lS_raw))).toFixed(4):null;
-  const mBTTS_adj=(H.found&&A.found)?+((1-Math.exp(-H.lS_adj))*(1-Math.exp(-A.lS_adj))).toFixed(4):null;
+  // Estimate rho from combined match history for this fixture
+  // Merges home+away records for a league-level rho estimate
+  const allMatchesForRho = [
+    ...(H.found ? getTeamMatches(home) : []),
+    ...(A.found ? getTeamMatches(away) : [])
+  ];
+  const rho = estimateRho(allMatchesForRho);
 
-  // ── Elo model — reuse homeKey/awayKey from DC lookup above ──
+  // ── BTTS: correlation-aware Dixon-Coles rho correction ──
+  // Replaces independent Poisson formula (1-e^-λH)(1-e^-λA)
+  // with the mathematically correct joint probability accounting for
+  // low-score dependence (0-0, 0-1, 1-0, 1-1 cells corrected by rho).
+  const mBTTS = (hLamDC !== null && aLamDC !== null)
+    ? dcBTTS(hLamDC, aLamDC, rho)
+    : null;
+
+  // Raw BTTS variants for comparison (also DC-corrected)
+  const mBTTS_raw = (H.found && A.found)
+    ? dcBTTS(H.lS_raw, A.lS_raw, rho)
+    : null;
+  const mBTTS_adj = (H.found && A.found)
+    ? dcBTTS(H.lS_adj, A.lS_adj, rho)
+    : null;
+
+  // ── Elo model — W/D/L probabilities only ──
+  // Elo does NOT contribute to BTTS (by design — see eloMatchProb())
   const eloProbs = (homeKey && awayKey)
     ? eloMatchProb(homeKey.toLowerCase(), awayKey.toLowerCase())
     : null;
@@ -1885,11 +2477,16 @@ function calcFixture(league,home,away,n,alpha=1.0){
   // ── Ensemble fusion ──
   const w   = getWeights();
   const cw  = getConfWeights();
-  const ensBTTS = (H.found && A.found && eloProbs)
-    ? fuseBTTS(mBTTS, eloProbs.btts, (formH.bttsFactor + formA.bttsFactor)/2, w)
+
+  // BTTS ensemble: Poisson (DC-corrected) + Form only — NO Elo
+  const formBTTS = (formH.bttsFactor + formA.bttsFactor) / 2;
+  const ensBTTS = (H.found && A.found && mBTTS !== null)
+    ? fuseBTTS(mBTTS, formBTTS, w)
     : mBTTS;
+
+  // 1X2 outcomes: Elo primary, Form adjustment — NO Poisson for outcomes
   const ensOutcomes = (H.found && A.found && eloProbs)
-    ? fuseOutcomes(mBTTS, eloProbs, formH, w)
+    ? fuseOutcomes(eloProbs, formH, w)
     : null;
 
   // ── Confidence ──
@@ -1903,11 +2500,20 @@ function calcFixture(league,home,away,n,alpha=1.0){
 
   return{
     league, home, away, fixture:`${home} vs ${away}`,
+    kickoff: meta.kickoff || '',
+    date:    meta.date    || '',
+    round:   meta.round   || '',
+    country: meta.country || '',
+    region:  meta.region  || '',
     H, A,
-    mBTTS, mBTTS_raw, mBTTS_adj,
+    mBTTS: mBTTS !== null ? +mBTTS.toFixed(4) : null,
+    mBTTS_raw: mBTTS_raw !== null ? +mBTTS_raw.toFixed(4) : null,
+    mBTTS_adj: mBTTS_adj !== null ? +mBTTS_adj.toFixed(4) : null,
+    rho: +rho.toFixed(4),
     dcLambdas: dcL,           // { lambdaHome, lambdaAway, homeAdvFactor, leagueAvg } or null
     eloProbs, formH, formA,
-    ensBTTS, ensOutcomes,
+    ensBTTS: ensBTTS !== null ? +ensBTTS.toFixed(4) : null,
+    ensOutcomes,
     conf,
     lambdaTotal,
     conservOU,
@@ -1984,18 +2590,8 @@ document.getElementById('fileA').addEventListener('change',async e=>{
   }catch(err){log(`✗ ${f.name}: ${err.message}`,'err');}
 });
 
-// FILE B
-document.getElementById('fileB').addEventListener('change',async e=>{
-  const f=e.target.files[0];if(!f)return;
-  try{
-    log(`Loading fixtures: ${f.name}…`);
-    fixSheets=await parseFile(f);
-    document.getElementById('cardB').classList.add('active');
-    document.getElementById('stB').textContent=`${f.name} · ${Object.values(fixSheets).reduce((s,r)=>s+r.length,0)} rows`;
-    log(`✓ Fixtures: ${f.name}`,'ok');
-    checkReady();
-  }catch(err){log(`✗ ${err.message}`,'err');}
-});
+// FILE B — fixtures now loaded from Drive (loadFixturesFromDrive)
+// Manual upload removed; fixSheets is set by loadFixturesFromDrive()
 
 document.getElementById('nSlider').addEventListener('input',()=>
   document.getElementById('nVal').textContent=document.getElementById('nSlider').value);
@@ -2050,12 +2646,16 @@ document.getElementById('runBtn').addEventListener('click',async()=>{
   await new Promise(r=>setTimeout(r,0)); // let DOM paint
 
   try{
-    // Phase 1 — Season filter + OSI
+    // Phase 1 — Season filter + OSI + frequency stats
     setProgress(10,'Building league model…');
     await new Promise(r=>setTimeout(r,0));
     const totalMatches = Object.values(matchStore).reduce((s,m)=>s+m.length,0);
     log(`Season filter: ${totalMatches} match records from ${SEASON_START.toDateString()} onwards`,'ok');
-    log(`Index: ${Object.keys(masterIdx).length} teams · ${Object.keys(_leagueParams).length} league(s) · ${Object.keys(matchStore).length} team histories`,'ok');
+
+    // Build league match-frequency baseline (used by computeAdjustedLambda)
+    _leagueFreqStats = computeLeagueFreqStats(matchStore);
+    log(`Frequency stats: avgDensity=${_leagueFreqStats.avgDensity.toFixed(4)} matches/day · avgRest=${_leagueFreqStats.avgRest.toFixed(1)} days`,'ok');
+
     _leagueOSIs=buildLeagueOSIs(n,alpha);
     log(`OSI mode: ${osiMode} · league OSI range: [${Math.min(..._leagueOSIs).toFixed(2)}, ${Math.max(..._leagueOSIs).toFixed(2)}] · recency α=${alpha.toFixed(2)}`,'ok');
 
@@ -2082,31 +2682,38 @@ document.getElementById('runBtn').addEventListener('click',async()=>{
       if(!rows.length)continue;
       const c=getCols(rows,C_HOME,C_AWAY,null,null);
       if(!c||!c.home||!c.away){log(`✗ No home/away cols in "${sh}"`,'err');continue;}
-      const hasLeagueCol = !!c.league;
-      const valid=rows.filter(r=>{
-        const h=String(r[c.home]||'').trim(),a=String(r[c.away]||'').trim();
-        if(!h||h==='undefined'||!a||a==='undefined') return false;
-        return true;
-      });
+      const valid=rows.filter(r=>{const h=String(r[c.home]||'').trim(),a=String(r[c.away]||'').trim();return h&&h!=='undefined'&&a&&a!=='undefined';});
       log(`"${sh}": ${valid.length} fixture(s)`);
-      allValid.push({sh,rows:valid,c});
+      // detect extra columns from Drive fixtures file
+      const c_kickoff = Object.keys(rows[0]).find(k=>k.toLowerCase().replace(/[\s_]/g,'') === 'kickoffutc') || null;
+      const c_date    = Object.keys(rows[0]).find(k=>k.toLowerCase() === 'date') || null;
+      const c_round   = Object.keys(rows[0]).find(k=>k.toLowerCase() === 'round') || null;
+      const c_league  = Object.keys(rows[0]).find(k=>k.toLowerCase() === 'league') || null;
+      const c_country = Object.keys(rows[0]).find(k=>k.toLowerCase() === 'country') || null;
+      allValid.push({sh,rows:valid,c,c_kickoff,c_date,c_round,c_league,c_country});
     }
     const totalFix=allValid.reduce((s,v)=>s+v.rows.length,0);
     let done=0;
-    for(const{sh,rows:valid,c} of allValid){
+    for(const{sh,rows:valid,c,c_kickoff,c_date,c_round,c_league,c_country} of allValid){
       for(const r of valid){
         const home=String(r[c.home]).trim(),away=String(r[c.away]).trim();
-        const leagueRaw = c.league ? String(r[c.league]||'').trim() : '';
-        const league = leagueRaw || detectLeague(home,away,histSheets,masterIdx);
-        const res=calcFixture(league,home,away,n,alpha);
+        // Use Drive-provided league/country if available; otherwise detect from history
+        const rowLeague  = c_league  ? String(r[c_league ]||'').trim() : '';
+        const rowCountry = c_country ? String(r[c_country]||'').trim() : '';
+        const league = rowLeague || detectLeague(home,away,histSheets,masterIdx);
+        const kickoff= c_kickoff ? String(r[c_kickoff]||'').trim() : '';
+        const date   = c_date    ? String(r[c_date   ]||'').trim() : '';
+        const round  = c_round   ? String(r[c_round  ]||'').trim() : '';
+        const meta   = { kickoff, date, round, country: rowCountry, region: sh };
+        const res=calcFixture(league,home,away,n,alpha,meta);
         results.push(res);
-        log(`  ${res.H.found&&res.A.found?'✓':'⚠'} [${league}] ${home} vs ${away}`);
+        const koLabel = kickoff ? ` @ ${kickoff.split(' ')[1]||kickoff}` : '';
+        log(`  ${res.H.found&&res.A.found?'✓':'⚠'} [${league}] ${home} vs ${away}${koLabel}`);
         done++;
-        // Update progress every fixture
         const pct=55+Math.round((done/totalFix)*35);
         setProgress(pct,`Analysing fixtures…`,`${done} of ${totalFix} complete`);
       }
-      await new Promise(r=>setTimeout(r,0)); // yield per sheet so UI stays responsive
+      await new Promise(r=>setTimeout(r,0));
     }
 
     // Phase 5 — Finalise
@@ -2201,7 +2808,7 @@ function applyFilters(){
     });
   } else {
     const dd=document.getElementById('sortSel').value;
-    if(dd){visRows.sort((x,y)=>{switch(dd){case'btts-d':return(y.mBTTS||0)-(x.mBTTS||0);case'btts-a':return(x.mBTTS||0)-(y.mBTTS||0);case'form-d':return(y.formDiff||0)-(x.formDiff||0);case'hform-d':return(y.H.form||0)-(x.H.form||0);case'hlam-d':return(y.H.lS||0)-(x.H.lS||0);case'ens-d':return(y.ensBTTS||0)-(x.ensBTTS||0);case'conf-d':return(y.conf?y.conf.score:0)-(x.conf?x.conf.score:0);case'over35-d':return(y.conservOU?y.conservOU.over35:0)-(x.conservOU?x.conservOU.over35:0);case'under15-d':return(y.conservOU?y.conservOU.under15:0)-(x.conservOU?x.conservOU.under15:0);default:return 0;}})}
+    if(dd){visRows.sort((x,y)=>{switch(dd){case'kickoff-a':return(x.kickoff||x.date||'').localeCompare(y.kickoff||y.date||'');case'kickoff-d':return(y.kickoff||y.date||'').localeCompare(x.kickoff||x.date||'');case'btts-d':return(y.mBTTS||0)-(x.mBTTS||0);case'btts-a':return(x.mBTTS||0)-(y.mBTTS||0);case'form-d':return(y.formDiff||0)-(x.formDiff||0);case'hform-d':return(y.H.form||0)-(x.H.form||0);case'hlam-d':return(y.H.lS||0)-(x.H.lS||0);case'ens-d':return(y.ensBTTS||0)-(x.ensBTTS||0);case'conf-d':return(y.conf?y.conf.score:0)-(x.conf?x.conf.score:0);case'over35-d':return(y.conservOU?y.conservOU.over35:0)-(x.conservOU?x.conservOU.over35:0);case'under15-d':return(y.conservOU?y.conservOU.under15:0)-(x.conservOU?x.conservOU.under15:0);default:return 0;}})}
   }
   document.getElementById('resCount').textContent=`Showing ${visRows.length} of ${allRows.length} fixtures`;
   renderTable(visRows);
@@ -2280,17 +2887,17 @@ let sortKey='', sortDir=-1;
 function ensBTTSCell(r) {
   if (!r.ensBTTS && r.ensBTTS !== 0) return '<td class="ens-cell" style="border-left:2px solid rgba(0,229,160,.1)">—</td>';
   const pois = r.mBTTS !== null ? (r.mBTTS*100).toFixed(1)+'%' : '—';
-  const elo  = r.eloProbs ? (r.eloProbs.btts*100).toFixed(1)+'%' : '—';
+  // NOTE: Elo no longer contributes to BTTS (Elo = W/D/L only)
   const formF= r.formH && r.formA ? (((r.formH.bttsFactor+r.formA.bttsFactor)/2)*100).toFixed(1)+'%' : '—';
+  const rhoLabel = r.rho !== undefined ? `ρ=${r.rho.toFixed(2)}` : '';
   const ens  = (r.ensBTTS*100).toFixed(1)+'%';
   return `<td class="ens-cell tb ${bttsClass(r.ensBTTS*100)}" style="border-left:2px solid rgba(0,229,160,.15)">
     <div class="ens-final">${ens}</div>
     <div style="display:flex;gap:4px;margin-top:2px">
-      <span class="ens-pois" title="Poisson">${pois}</span>
-      <span style="color:var(--t3)">·</span>
-      <span class="ens-elo" title="Elo">${elo}</span>
+      <span class="ens-pois" title="Poisson+DC">${pois}</span>
       <span style="color:var(--t3)">·</span>
       <span class="ens-form-c" title="Form">${formF}</span>
+      <span style="color:var(--t3);font-size:.48rem" title="Dixon-Coles rho">${rhoLabel}</span>
     </div>
   </td>`;
 }
@@ -2340,6 +2947,13 @@ function renderTable(rows){
     const pill=(!H.found||!A.found)?'<span class="pill p-err">No data</span>':
                (H.low||A.low)?'<span class="pill p-warn">Low N</span>':
                '<span class="pill p-ok">✓</span>';
+    // ── kickoff / date / round display ──
+    const koTime = r.kickoff ? r.kickoff.split(' ')[1] || '' : '';
+    const koDate = r.date || (r.kickoff ? r.kickoff.split(' ')[0] : '');
+    const koLabel = koTime ? `<span class="fix-ko">${koDate} <b>${koTime}</b> UTC</span>` :
+                   koDate  ? `<span class="fix-ko">${koDate}</span>` : '';
+    const rdLabel = r.round ? `<span class="fix-rd">${r.round}</span>` : '';
+    const lgLabel = r.league ? `<span class="fix-lg">${r.league}${r.country?' · '+r.country:''}</span>` : '';
     const isHot=btts!==null&&btts>=70;
     // λ display — show adj badge in adj/both modes
     const hLamDisp = H.found ? (osiMode==='both'
@@ -2349,7 +2963,7 @@ function renderTable(rows){
       ? `<span style="color:var(--t3);font-size:.65rem">${fmt2(A.lS_raw)}</span><span style="color:var(--t3);margin:0 2px">→</span><span style="color:var(--accent)">${fmt2(A.lS_adj)}</span>`
       : fmt2(A.lS)) : '—';
     return`<tr class="${isHot?'hot':''}" data-i="${i}" style="animation-delay:${Math.min(i*12,400)}ms">
-      <td class="col-fix"><span class="td-fix">${r.fixture}</span> ${pill}</td>
+      <td class="col-fix"><span class="td-fix">${r.fixture}</span> ${pill}${koLabel||rdLabel||lgLabel?`<div class="fix-meta">${koLabel}${rdLabel}${lgLabel}</div>`:''}</td>
       <!-- O/U SIGNAL -->
       ${conservCell(r)}
       <!-- BTTS: Home, Away, Match -->
@@ -2386,6 +3000,7 @@ function sv(r,k){
   switch(k){
     case 'league': return r.league;
     case 'fixture': return r.fixture;
+    case 'kickoff': return r.kickoff || r.date || '';
     case 'hN':  return r.H.N||0;
     case 'hLs': return r.H.lS||0;
     case 'hLc': return r.H.lC||0;
@@ -2413,17 +3028,21 @@ function sv(r,k){
 // ═══════════════════════════════════════════════
 function openDrawer(r){
   document.getElementById('dFix').textContent=r.fixture;
-  document.getElementById('dSub').textContent=`${r.league} · ${r.H.found?r.H.N:0} home / ${r.A.found?r.A.N:0} away games used`;
+  const koStr = r.kickoff ? ` · ${r.kickoff} UTC` : (r.date ? ` · ${r.date}` : '');
+  const rdStr = r.round   ? ` · ${r.round}` : '';
+  document.getElementById('dSub').textContent=`${r.league}${koStr}${rdStr} · ${r.H.found?r.H.N:0} home / ${r.A.found?r.A.N:0} away games used`;
   document.getElementById('dBody').innerHTML=ensembleSection(r)+teamSection(r.H,'Home')+teamSection(r.A,'Away');
   document.getElementById('drawer').classList.add('open');
   document.getElementById('ov').classList.add('open');
 }
 
 function ensembleSection(r) {
-  const pBTTS = r.mBTTS !== null ? (r.mBTTS*100).toFixed(1)+'%' : '—';
-  const eloBTTS= r.eloProbs ? (r.eloProbs.btts*100).toFixed(1)+'%' : '—';
+  const pBTTS  = r.mBTTS !== null ? (r.mBTTS*100).toFixed(1)+'%' : '—';
+  // Elo does NOT contribute to BTTS — show N/A with explanation
+  const eloBTTS= '— (W/D/L only)';
   const fmBTTS = r.formH && r.formA ? (((r.formH.bttsFactor+r.formA.bttsFactor)/2)*100).toFixed(1)+'%' : '—';
   const ensBTTS= r.ensBTTS !== null ? (r.ensBTTS*100).toFixed(1)+'%' : '—';
+  const rhoDisp = r.rho !== undefined ? r.rho.toFixed(3) : '—';
 
   // DC λ display
   const dcSection = r.dcLambdas ? `
@@ -2475,130 +3094,24 @@ function ensembleSection(r) {
   const ensOutD  = r.ensOutcomes ? (r.ensOutcomes.draw*100).toFixed(1)+'%' : draw;
   const ensOutA  = r.ensOutcomes ? (r.ensOutcomes.aw*100).toFixed(1)+'%' : aWin;
 
-  // ── Debug section ──
-  const na = v => (v !== null && v !== undefined) ? v : '—';
-  const pct = v => (v !== null && v !== undefined) ? (v*100).toFixed(2)+'%' : '—';
-  const fix4 = v => (v !== null && v !== undefined) ? (+v).toFixed(4) : '—';
-
-  const hLam  = r.dcLambdas ? r.dcLambdas.lambdaHome : r.H.lS;
-  const aLam  = r.dcLambdas ? r.dcLambdas.lambdaAway : r.A.lS;
-  const hBTTS_component = hLam !== null ? (1 - Math.exp(-hLam)) : null;
-  const aBTTS_component = aLam !== null ? (1 - Math.exp(-aLam)) : null;
-  const btts_check = (hBTTS_component !== null && aBTTS_component !== null)
-    ? (hBTTS_component * aBTTS_component) : null;
-
-  const hLeague = r.H.found && _teamRatings[fuzzy(r.home,masterIdx)?.toLowerCase()]
-    ? _teamRatings[fuzzy(r.home,masterIdx).toLowerCase()].league : '—';
-  const aLeague = r.A.found && _teamRatings[fuzzy(r.away,masterIdx)?.toLowerCase()]
-    ? _teamRatings[fuzzy(r.away,masterIdx).toLowerCase()].league : '—';
-
-  const debugSection = `
-  <details style="margin-bottom:16px">
-    <summary style="cursor:pointer;font-family:var(--mono);font-size:.58rem;letter-spacing:1.5px;text-transform:uppercase;color:#ff8a80;padding:10px 12px;background:rgba(255,138,128,.06);border:1px solid rgba(255,138,128,.2);border-radius:8px;list-style:none;display:flex;align-items:center;gap:6px">
-      🔬 Debug — Raw Calculation Trace
-      <span style="margin-left:auto;font-size:.55rem;color:var(--t3)">(click to expand)</span>
-    </summary>
-    <div style="padding:12px;background:rgba(0,0,0,.3);border:1px solid rgba(255,138,128,.15);border-top:none;border-radius:0 0 8px 8px;font-family:var(--mono);font-size:.58rem;line-height:1.9">
-
-      <div style="color:#ffd166;margin-bottom:8px;font-size:.6rem">── DATA INPUTS ──</div>
-
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
-        <div style="padding:8px;background:rgba(0,0,0,.2);border-radius:6px">
-          <div style="color:var(--accent);margin-bottom:4px">${r.home}</div>
-          <div>Matched in data: <b style="color:${r.H.found?'var(--accent)':'var(--a2)'}">${r.H.found ? 'YES' : 'NO'}</b></div>
-          <div>Games used (n): <b style="color:var(--t1)">${na(r.H.N)}</b></div>
-          <div>Goals scored (total): <b style="color:var(--t1)">${na(r.H.totS)}</b></div>
-          <div>Goals conceded (total): <b style="color:var(--t1)">${na(r.H.totC)}</b></div>
-          <div>Raw λ scored: <b style="color:var(--t1)">${fix4(r.H.lS_raw)}</b></div>
-          <div>Raw λ conceded: <b style="color:var(--t1)">${fix4(r.H.lC_raw)}</b></div>
-          <div>OSI-adj λ scored: <b style="color:var(--t1)">${fix4(r.H.lS_adj)}</b></div>
-          <div>Active λ (${r.H.osiMode}): <b style="color:#ffd166">${fix4(r.H.lS)}</b></div>
-          <div>Attack rating: <b style="color:var(--t1)">${fix4(r.H.attackRating)}</b></div>
-          <div>Defence rating: <b style="color:var(--t1)">${fix4(r.H.defenceRating)}</b></div>
-          <div>Domestic league: <b style="color:var(--t1)">${hLeague}</b></div>
-          <div>Clean sheets: <b style="color:var(--t1)">${na(r.H.cs)} / ${na(r.H.N)}</b></div>
-          <div>Failed to score: <b style="color:var(--t1)">${na(r.H.fts)} / ${na(r.H.N)}</b></div>
-        </div>
-        <div style="padding:8px;background:rgba(0,0,0,.2);border-radius:6px">
-          <div style="color:#ffd166;margin-bottom:4px">${r.away}</div>
-          <div>Matched in data: <b style="color:${r.A.found?'var(--accent)':'var(--a2)'}">${r.A.found ? 'YES' : 'NO'}</b></div>
-          <div>Games used (n): <b style="color:var(--t1)">${na(r.A.N)}</b></div>
-          <div>Goals scored (total): <b style="color:var(--t1)">${na(r.A.totS)}</b></div>
-          <div>Goals conceded (total): <b style="color:var(--t1)">${na(r.A.totC)}</b></div>
-          <div>Raw λ scored: <b style="color:var(--t1)">${fix4(r.A.lS_raw)}</b></div>
-          <div>Raw λ conceded: <b style="color:var(--t1)">${fix4(r.A.lC_raw)}</b></div>
-          <div>OSI-adj λ scored: <b style="color:var(--t1)">${fix4(r.A.lS_adj)}</b></div>
-          <div>Active λ (${r.A.osiMode}): <b style="color:#ffd166">${fix4(r.A.lS)}</b></div>
-          <div>Attack rating: <b style="color:var(--t1)">${fix4(r.A.attackRating)}</b></div>
-          <div>Defence rating: <b style="color:var(--t1)">${fix4(r.A.defenceRating)}</b></div>
-          <div>Domestic league: <b style="color:var(--t1)">${aLeague}</b></div>
-          <div>Clean sheets: <b style="color:var(--t1)">${na(r.A.cs)} / ${na(r.A.N)}</b></div>
-          <div>Failed to score: <b style="color:var(--t1)">${na(r.A.fts)} / ${na(r.A.N)}</b></div>
-        </div>
-      </div>
-
-      <div style="color:#ffd166;margin-bottom:8px;font-size:.6rem">── LEAGUE CONTEXT ──</div>
-      <div style="padding:8px;background:rgba(0,0,0,.2);border-radius:6px;margin-bottom:12px">
-        <div>League passed in: <b style="color:var(--t1)">${r.league}</b></div>
-        ${r.dcLambdas ? `
-        <div>DC league avg goals/game: <b style="color:var(--t1)">${fix4(r.dcLambdas.leagueAvg)}</b></div>
-        <div>Home advantage factor: <b style="color:var(--t1)">×${fix4(r.dcLambdas.homeAdvFactor)}</b></div>
-        <div>Away advantage factor: <b style="color:var(--t1)">×${fix4(r.dcLambdas.awayAdvFactor)}</b></div>
-        <div>Source: <b style="color:var(--accent)">Dixon-Coles model active</b></div>
-        ` : `<div>Source: <b style="color:#ffd166">DC model unavailable — using raw λ fallback</b></div>`}
-      </div>
-
-      <div style="color:#ffd166;margin-bottom:8px;font-size:.6rem">── BTTS FORMULA TRACE ──</div>
-      <div style="padding:8px;background:rgba(0,0,0,.2);border-radius:6px;margin-bottom:12px">
-        <div style="color:var(--t2);margin-bottom:6px">Formula: BTTS = (1 − e<sup>−λH</sup>) × (1 − e<sup>−λA</sup>)</div>
-        <div>λ Home used: <b style="color:#ffd166">${fix4(hLam)}</b> ${r.dcLambdas ? '(DC)' : '(raw)'}</div>
-        <div>λ Away used: <b style="color:#ffd166">${fix4(aLam)}</b> ${r.dcLambdas ? '(DC)' : '(raw)'}</div>
-        <div>P(Home scores) = 1 − e<sup>−${fix4(hLam)}</sup> = <b style="color:var(--accent)">${hBTTS_component !== null ? hBTTS_component.toFixed(4) : '—'}</b></div>
-        <div>P(Away scores) = 1 − e<sup>−${fix4(aLam)}</sup> = <b style="color:var(--accent)">${aBTTS_component !== null ? aBTTS_component.toFixed(4) : '—'}</b></div>
-        <div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,.08)">
-          BTTS check = ${hBTTS_component !== null ? hBTTS_component.toFixed(4) : '—'} × ${aBTTS_component !== null ? aBTTS_component.toFixed(4) : '—'} = 
-          <b style="color:${btts_check !== null && Math.abs(btts_check - (r.mBTTS||0)) < 0.001 ? 'var(--accent)' : '#ffd166'}">
-            ${btts_check !== null ? (btts_check*100).toFixed(2)+'%' : '—'}
-          </b>
-        </div>
-        <div>Stored mBTTS (Poisson): <b style="color:var(--t1)">${pct(r.mBTTS)}</b></div>
-        <div>Final Ensemble BTTS: <b style="color:var(--accent)">${pct(r.ensBTTS)}</b></div>
-        ${btts_check !== null && r.mBTTS !== null && Math.abs(btts_check - r.mBTTS) > 0.001
-          ? `<div style="color:#ff4d6d;margin-top:6px">⚠ MISMATCH — recalculated BTTS differs from stored value by ${Math.abs(btts_check - r.mBTTS).toFixed(4)}</div>`
-          : `<div style="color:var(--accent);margin-top:6px">✓ BTTS check matches stored value</div>`
-        }
-      </div>
-
-      <div style="color:#ffd166;margin-bottom:8px;font-size:.6rem">── ELO ──</div>
-      <div style="padding:8px;background:rgba(0,0,0,.2);border-radius:6px">
-        <div>Home Elo: <b style="color:var(--t1)">${r.eloProbs ? r.eloProbs.homeElo : '—'}</b></div>
-        <div>Away Elo: <b style="color:var(--t1)">${r.eloProbs ? r.eloProbs.awayElo : '—'}</b></div>
-        <div>Elo diff: <b style="color:var(--t1)">${r.eloProbs ? r.eloProbs.eloDiff : '—'}</b></div>
-        <div>Elo BTTS: <b style="color:var(--t1)">${pct(r.eloProbs ? r.eloProbs.btts : null)}</b></div>
-      </div>
-
-    </div>
-  </details>`;
-
   return `<div style="border-bottom:1px solid var(--gb);padding-bottom:16px;margin-bottom:16px">
     <div style="font-size:.7rem;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px">
       🔀 Ensemble Prediction ${ensMode==='ensemble'?'<span style="color:var(--accent);font-size:.58rem">(ACTIVE)</span>':'<span style="color:var(--t3);font-size:.58rem">(Enable in sidebar)</span>'}
     </div>
 
     ${dcSection}
-    ${debugSection}
 
     <!-- Model cards -->
     <div class="model-grid">
       <div class="model-card">
         <div class="mc-val" style="color:var(--a4)">${pBTTS}</div>
-        <div class="mc-lbl">🔵 Poisson</div>
-        <div class="mc-sub">BTTS probability</div>
+        <div class="mc-lbl">🔵 Poisson+DC</div>
+        <div class="mc-sub">BTTS · ρ=${rhoDisp}</div>
       </div>
       <div class="model-card">
-        <div class="mc-val" style="color:#ffd166">${eloBTTS}</div>
-        <div class="mc-lbl">🟡 Elo</div>
-        <div class="mc-sub">Elo: ${eHelo} vs ${eAelo}</div>
+        <div class="mc-val" style="color:#ffd166">${hWin} / ${draw} / ${aWin}</div>
+        <div class="mc-lbl">🟡 Elo (1X2)</div>
+        <div class="mc-sub">H:${eHelo} A:${eAelo} (Δ${eloDiff>0?'+':''}${eloDiff})</div>
       </div>
       <div class="model-card">
         <div class="mc-val" style="color:#ff8a80">${fmBTTS}</div>
@@ -2709,6 +3222,38 @@ function teamSection(T,label){
     </tr>`;
   }).join('');
 
+  // ── frequency adjustment panel ──────────────────────────────────────
+  const hasFq = T.fatigueFactor !== undefined && !T.freqLowConf;
+  const fqColor = v => v > 1.02 ? 'var(--accent)' : v < 0.98 ? 'var(--a2)' : 'var(--t1)';
+  const fqSign  = v => v > 0 ? '+' : '';
+  const freqSection = hasFq ? `
+  <div style="margin:10px 0;padding:11px 12px;background:rgba(0,185,255,.05);border:1px solid rgba(0,185,255,.18);border-radius:8px">
+    <div style="font-family:var(--mono);font-size:.5rem;letter-spacing:2px;text-transform:uppercase;color:#00b9ff;margin-bottom:8px">⏱ Match Frequency Adjustment</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:8px">
+      <div style="text-align:center;padding:7px;background:rgba(0,0,0,.25);border-radius:6px">
+        <div style="font-family:var(--mono);font-size:.9rem;font-weight:700;color:${fqColor(T.fatigueFactor)}">${T.fatigueFactor.toFixed(3)}</div>
+        <div style="font-size:.52rem;color:var(--t3);margin-top:2px">Fatigue ×atk</div>
+      </div>
+      <div style="text-align:center;padding:7px;background:rgba(0,0,0,.25);border-radius:6px">
+        <div style="font-family:var(--mono);font-size:.9rem;font-weight:700;color:${fqColor(T.restBoost)}">${T.restBoost.toFixed(3)}</div>
+        <div style="font-size:.52rem;color:var(--t3);margin-top:2px">Rest Boost ×atk</div>
+      </div>
+      <div style="text-align:center;padding:7px;background:rgba(0,0,0,.25);border-radius:6px">
+        <div style="font-family:var(--mono);font-size:.9rem;font-weight:700;color:var(--a4)">${T.windowDays.toFixed(0)}d</div>
+        <div style="font-size:.52rem;color:var(--t3);margin-top:2px">Sample Window</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:14px;font-family:var(--mono);font-size:.55rem;color:var(--t3)">
+      <span>Density: <b style="color:var(--t1)">${(T.density * 7).toFixed(2)}/wk</b></span>
+      <span>Last rest: <b style="color:var(--t1)">${T.lastRestDays.toFixed(0)}d ago</b></span>
+      <span>League avg rest: <b style="color:var(--t1)">${(_leagueFreqStats.avgRest||7).toFixed(1)}d</b></span>
+      <span>Net λ Δ: <b style="color:${T.lS_freq>T.lS_raw?'var(--accent)':'var(--a2)'}">${fqSign(T.lS_freq-T.lS_raw)}${(T.lS_freq-T.lS_raw).toFixed(3)}</b></span>
+    </div>
+  </div>` : (T.freqLowConf ? `
+  <div style="margin:8px 0;padding:8px 12px;background:rgba(255,209,102,.06);border:1px solid rgba(255,209,102,.2);border-radius:7px;font-family:var(--mono);font-size:.55rem;color:#ffd166">
+    ⚠ Too few dated matches for frequency adjustment (min ${FREQ_CONFIG.minMatches})
+  </div>` : '');
+
   return`<div class="dts">
     <div class="dts-hd">
       <div class="dts-name">${T.name} <span style="color:var(--t3);font-weight:400">(${label})</span></div>
@@ -2717,11 +3262,12 @@ function teamSection(T,label){
     <div class="dts-sum">
       <div class="dts-s"><span class="dts-sv" style="color:var(--a4)">${T.lS_raw.toFixed(2)}</span><span class="dts-sk">λ Scored (raw)</span></div>
       <div class="dts-s"><span class="dts-sv">${T.lC_raw.toFixed(2)}</span><span class="dts-sk">λ Con. (raw)</span></div>
-      <div class="dts-s"><span class="dts-sv" style="color:var(--accent)">${T.lS_adj.toFixed(2)}</span><span class="dts-sk">λ Scored (adj)</span></div>
-      <div class="dts-s"><span class="dts-sv" style="color:#ffd166">${T.lC_adj.toFixed(2)}</span><span class="dts-sk">λ Con. (adj)</span></div>
+      <div class="dts-s"><span class="dts-sv" style="color:var(--accent)">${T.lS_freq!==undefined?T.lS_freq.toFixed(2):T.lS_adj.toFixed(2)}</span><span class="dts-sk">λ Scored (adj)</span></div>
+      <div class="dts-s"><span class="dts-sv" style="color:#ffd166">${T.lC_freq!==undefined?T.lC_freq.toFixed(2):T.lC_adj.toFixed(2)}</span><span class="dts-sk">λ Con. (adj)</span></div>
       <div class="dts-s"><span class="dts-sv" style="color:var(--accent)">${T.cs}</span><span class="dts-sk">Clean Sheets</span></div>
       <div class="dts-s"><span class="dts-sv" style="color:${T.form!==null?scoreCol(T.form):'var(--t1)'}">${T.form!==null?T.form.toFixed(1):'—'}</span><span class="dts-sk">Form Score</span></div>
     </div>
+    ${freqSection}
     <table class="ht">
       <thead><tr><th>Date</th><th>H/A</th><th>Opponent</th><th>Score</th><th>CS</th><th>Sample</th></tr></thead>
       <tbody>${rows}</tbody>
