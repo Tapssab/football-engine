@@ -1310,9 +1310,16 @@ let allRows = [], visRows = [], loadedFiles = [];
 // ═══════════════════════════════════════════════
 const C_HOME=['HomeTeam','Home Team','home_team','hometeam','home','Home','HT','h team'];
 const C_AWAY=['AwayTeam','Away Team','away_team','awayteam','away','Away','AT','a team'];
-const C_FTHG=['FTHG','fthg','HomeGoals','HG','Home Goals','Score H','GF','home goals'];
-const C_FTAG=['FTAG','ftag','AwayGoals','AG','Away Goals','Score A','GA','away goals'];
+// Google Drive sheet uses home_goals / away_goals
+const C_FTHG=['FTHG','fthg','HomeGoals','HG','Home Goals','Score H','GF','home goals','home_goals'];
+const C_FTAG=['FTAG','ftag','AwayGoals','AG','Away Goals','Score A','GA','away goals','away_goals'];
 const C_DATE=['Date','date','DATE','MatchDate','match_date'];
+// xG columns (optional — football-data.co.uk and Google Drive: HXG / AXG)
+const C_HXG =['HxG','Hxg','hxg','HomeXG','home_xg','xG_H','xGH','Home xG','HomexG','HXG'];
+const C_AXG =['AxG','Axg','axg','AwayXG','away_xg','xG_A','xGA_','Away xG','AwayxG','AXG'];
+// Shots on Target columns — Google Drive uses HSOT / ASOT
+const C_HST =['HST','hst','HomeST','home_sot','SOT_H','ShotsOnTargetH','home shots on target','hs','HSOT'];
+const C_AST =['AST','ast','AwayST','away_sot','SOT_A','ShotsOnTargetA','away shots on target','as','ASOT'];
 const DIV={E0:'Premier League',E1:'Championship',E2:'League One',E3:'League Two',EC:'National League',SC0:'Scottish Prem',SC1:'Scottish Champ',SC2:'Scottish L1',SC3:'Scottish L2',D1:'Bundesliga',D2:'Bundesliga 2',SP1:'La Liga',SP2:'La Liga 2',I1:'Serie A',I2:'Serie B',F1:'Ligue 1',F2:'Ligue 2',B1:'Belgian Pro',N1:'Eredivisie',P1:'Primeira Liga',T1:'Süper Lig',G1:'Super League GR'};
 const divName=s=>DIV[s]||s;
 
@@ -1335,8 +1342,11 @@ function fuzzy(name,idx){const n=name.toLowerCase().trim();if(idx[n])return idx[
 // ═══════════════════════════════════════════════
 function buildMasterIndex(sheets){
   const idx={};
-  for(const[,rows]of Object.entries(sheets)){
-    if(!rows.length)continue;
+  for(const[,rows_raw]of Object.entries(sheets)){
+    if(!rows_raw.length)continue;
+    let rows;
+    try { rows = preprocessDriveSheet(rows_raw); }
+    catch(e) { log('Column mapping error (index): ' + e.message, 'err'); continue; }
     const c=getCols(rows,C_HOME,C_AWAY,null,null);
     if(!c||(!c.home&&!c.away))continue;
     const dateCol=findCol(rows[0],C_DATE);
@@ -1406,13 +1416,106 @@ function isCurrentSeason(dateStr) {
   return d >= SEASON_START;
 }
 
+// ═══════════════════════════════════════════════
+// GOOGLE DRIVE SHEET PREPROCESSOR
+// Maps Google Drive column names → internal model names,
+// validates required columns, and casts all numeric values safely.
+// Column mapping:
+//   home_goals → FTHG  |  away_goals → FTAG
+//   HSOT       → HST   |  ASOT       → AST
+//   HXG        → HxG   |  AXG        → AxG  (nullable — missing = null, not 0)
+// ═══════════════════════════════════════════════
+const DRIVE_COLUMN_MAP = {
+  'home_goals': 'FTHG',
+  'away_goals': 'FTAG',
+  'HSOT':       'HST',
+  'ASOT':       'AST',
+  'HXG':        'HxG',
+  'AXG':        'AxG',
+};
+
+// Required Drive columns — xG columns are intentionally absent (optional).
+const DRIVE_REQUIRED_COLS = ['home_goals', 'away_goals', 'HSOT', 'ASOT'];
+
+/**
+ * preprocessDriveSheet(rows)
+ *
+ * Inspects the header row. If it contains Google Drive column names
+ * (home_goals / away_goals etc.) the rows are remapped to internal column
+ * names so the existing pipeline sees a familiar schema.
+ *
+ * Required columns missing  -> throws a descriptive Error listing them.
+ * xG (HXG / AXG) missing    -> silently omitted (treated as null downstream).
+ * All numeric fields cast to float; goals default 0, SOT default 0,
+ * xG default NaN (preserved as null in the model).
+ *
+ * Returns: array of remapped row objects, or the original rows unchanged
+ * if no Drive-style columns are detected.
+ */
+function preprocessDriveSheet(rows) {
+  if (!rows || !rows.length) return rows;
+
+  const header = Object.keys(rows[0]);
+  const headerSet = new Set(header);
+
+  // Detect whether this is a Drive-format sheet
+  const isDriveSheet = DRIVE_REQUIRED_COLS.some(col => headerSet.has(col));
+  if (!isDriveSheet) return rows; // Not a Drive sheet — pass through unchanged
+
+  // Validate all required columns are present
+  const missing = DRIVE_REQUIRED_COLS.filter(col => !headerSet.has(col));
+  if (missing.length) {
+    throw new Error(
+      'Google Drive sheet is missing required column(s): ' + missing.join(', ') + '. ' +
+      'Expected columns: ' + DRIVE_REQUIRED_COLS.join(', ') + '.'
+    );
+  }
+
+  const foundCols = Object.keys(DRIVE_COLUMN_MAP).filter(k => headerSet.has(k));
+  log('Drive sheet detected — remapping columns: ' + foundCols.join(', '), 'ok');
+
+  return rows.map(function(row) {
+    var out = Object.assign({}, row); // preserve unmapped columns (Date, HomeTeam…)
+
+    for (var src in DRIVE_COLUMN_MAP) {
+      var dst = DRIVE_COLUMN_MAP[src];
+      if (!(src in row)) continue; // column absent (e.g. HXG/AXG optional)
+
+      var raw = row[src];
+
+      if (src === 'HXG' || src === 'AXG') {
+        // xG: empty / non-numeric → NaN (null in model), never coerce to 0
+        var xv = parseFloat(raw);
+        out[dst] = (raw === '' || raw === null || raw === undefined || isNaN(xv)) ? NaN : xv;
+      } else {
+        // Goals and SOT: empty / non-numeric → safe default 0
+        var nv = parseFloat(raw);
+        out[dst] = isFinite(nv) ? nv : 0;
+      }
+
+      // Remove the original Drive key so downstream sees only internal names
+      if (src !== dst) delete out[src];
+    }
+
+    return out;
+  });
+}
+
 function buildMatchStore(sheets,idx){
   const store={};
   const en=k=>{if(!store[k])store[k]=[];};
-  for(const[,rows]of Object.entries(sheets)){
-    if(!rows.length)continue;
+  for(const[,rows_raw]of Object.entries(sheets)){
+    if(!rows_raw.length)continue;
+    let rows;
+    try { rows = preprocessDriveSheet(rows_raw); }
+    catch(e) { log('Column mapping error: ' + e.message, 'err'); continue; }
     const c=getCols(rows,C_HOME,C_AWAY,C_FTHG,C_FTAG);
     if(!c||!c.home||!c.away||!c.fthg||!c.ftag)continue;
+    // Optional signal columns — null when absent
+    const cHxg = findCol(rows[0], C_HXG);
+    const cAxg = findCol(rows[0], C_AXG);
+    const cHst = findCol(rows[0], C_HST);
+    const cAst = findCol(rows[0], C_AST);
     for(const r of rows){
       const hR=String(r[c.home]||'').trim(),aR=String(r[c.away]||'').trim();
       const hg=parseFloat(r[c.fthg]),ag=parseFloat(r[c.ftag]);
@@ -1421,8 +1524,13 @@ function buildMatchStore(sheets,idx){
       const dt=c.date?String(r[c.date]||'').trim():'';
       // Current season filter — skip matches before SEASON_START
       if (dt && !isCurrentSeason(dt)) continue;
-      if(hC){const k=hC.toLowerCase();en(k);store[k].push({scored:hg,conceded:ag,date:dt,opponent:aC||aR,venue:'H',hg,ag});}
-      if(aC){const k=aC.toLowerCase();en(k);store[k].push({scored:ag,conceded:hg,date:dt,opponent:hC||hR,venue:'A',hg,ag});}
+      // Parse optional signals safely
+      const hxg = cHxg ? (v=>isFinite(v)&&v>=0?v:null)(parseFloat(r[cHxg])) : null;
+      const axg = cAxg ? (v=>isFinite(v)&&v>=0?v:null)(parseFloat(r[cAxg])) : null;
+      const hst = cHst ? (v=>isFinite(v)&&v>=0?v:null)(parseFloat(r[cHst])) : null;
+      const ast = cAst ? (v=>isFinite(v)&&v>=0?v:null)(parseFloat(r[cAst])) : null;
+      if(hC){const k=hC.toLowerCase();en(k);store[k].push({scored:hg,conceded:ag,date:dt,opponent:aC||aR,venue:'H',hg,ag,xg:hxg,xga:axg,sot:hst,sot_faced:ast});}
+      if(aC){const k=aC.toLowerCase();en(k);store[k].push({scored:ag,conceded:hg,date:dt,opponent:hC||hR,venue:'A',hg,ag,xg:axg,xga:hxg,sot:ast,sot_faced:hst});}
     }
   }
   // Sort each team's matches chronologically (oldest → newest) so that
@@ -1800,8 +1908,17 @@ function buildLeagueParams(n, alpha=1.0) {
     const c = getCols(rows, C_HOME, C_AWAY, C_FTHG, C_FTAG);
     if (!c || !c.home || !c.away || !c.fthg || !c.ftag) continue;
     const league = divName(sh);
-    if (!leagueGoals[league]) leagueGoals[league] = { homeGoals:0, awayGoals:0, homeGames:0, awayGames:0 };
+    if (!leagueGoals[league]) leagueGoals[league] = {
+      homeGoals:0, awayGoals:0, homeGames:0, awayGames:0,
+      sumHxg:0, sumAxg:0, xgGames:0,
+      sumHst:0, sumAst:0, sotGames:0
+    };
     const lg = leagueGoals[league];
+    // Optional signal columns
+    const cHxg = findCol(rows[0], C_HXG);
+    const cAxg = findCol(rows[0], C_AXG);
+    const cHst = findCol(rows[0], C_HST);
+    const cAst = findCol(rows[0], C_AST);
     for (const r of rows) {
       const dt = c.date ? String(r[c.date]||'').trim() : '';
       if (dt && !isCurrentSeason(dt)) continue; // current season only
@@ -1809,6 +1926,20 @@ function buildLeagueParams(n, alpha=1.0) {
       if (isNaN(hg) || isNaN(ag)) continue;
       lg.homeGoals += hg; lg.awayGoals += ag;
       lg.homeGames++; lg.awayGames++;
+      // xG accumulation
+      if (cHxg && cAxg) {
+        const hx = parseFloat(r[cHxg]), ax = parseFloat(r[cAxg]);
+        if (isFinite(hx) && hx >= 0 && isFinite(ax) && ax >= 0) {
+          lg.sumHxg += hx; lg.sumAxg += ax; lg.xgGames++;
+        }
+      }
+      // SOT accumulation
+      if (cHst && cAst) {
+        const hs = parseFloat(r[cHst]), as_ = parseFloat(r[cAst]);
+        if (isFinite(hs) && hs >= 0 && isFinite(as_) && as_ >= 0) {
+          lg.sumHst += hs; lg.sumAst += as_; lg.sotGames++;
+        }
+      }
     }
   }
 
@@ -1824,7 +1955,11 @@ function buildLeagueParams(n, alpha=1.0) {
     // Distribute symmetrically using sqrt
     const homeAdvFactor = Math.sqrt(homeAdv);
     const awayAdvFactor = 1 / homeAdvFactor;
-    params[league] = { avgScored, avgHome, avgAway, homeAdv, homeAdvFactor, awayAdvFactor };
+    // League-level xG averages (null when no xG data present)
+    const avgXg  = lg.xgGames  > 0 ? (lg.sumHxg + lg.sumAxg) / (2 * lg.xgGames) : null;
+    // League-level SOT averages (null when no SOT data present)
+    const avgSot = lg.sotGames > 0 ? (lg.sumHst + lg.sumAst) / (2 * lg.sotGames) : null;
+    params[league] = { avgScored, avgHome, avgAway, homeAdv, homeAdvFactor, awayAdvFactor, avgXg, avgSot };
   }
   return params;
 }
@@ -2542,6 +2677,199 @@ function setEnsMode(m) {
 let osiMode='raw'; // 'raw' | 'adj' | 'both'
 let _leagueOSIs=[];  // populated on each Run
 
+// ═══════════════════════════════════════════════════════════════════════
+// ── xG / SOT INTENT SIGNAL ENGINE ─────────────────────────────────────
+//
+// Adds a tiny multiplicative adjustment to base λ values:
+//   - xG (if available): primary attacking intent signal, weight ε_xg
+//   - SOT (always present when data has it): minor aggression signal, ε_sot
+//
+// DESIGN CONSTRAINTS:
+//   • Goals remain the dominant factor in λ — these are low-weight nudges
+//   • All multipliers are clamped ∈ [0.90, 1.10] before application
+//   • Final combined adjustment kept within ≈ ±5% of base λ
+//   • If xG missing → xG signal = 1.0 (no contribution)
+//   • If both missing → multiplier = 1.0 (exact original model behaviour)
+// ═══════════════════════════════════════════════════════════════════════
+
+/** Tuning constants — small by design to avoid model volatility */
+const INTENT_CFG = {
+  epsilon_xg:  0.07,  // weight of xG signal (range 0.05–0.10)
+  epsilon_sot: 0.03,  // weight of SOT signal (range 0.02–0.04)
+  xg_scale:    0.30,  // compress xG ratio toward 1.0
+  sot_scale:   0.20,  // compress SOT ratio toward 1.0 (smaller = more conservative)
+  clamp_lo:    0.90,  // lower bound for any single signal
+  clamp_hi:    1.10,  // upper bound for any single signal
+  mult_lo:     0.95,  // final multiplier floor  (≈ −5% max reduction)
+  mult_hi:     1.05,  // final multiplier ceiling (≈ +5% max boost)
+};
+
+/**
+ * Safe ratio helper: value / average, returns 1.0 when average is 0/null/NaN.
+ */
+function _safeRatio(value, avg) {
+  if (!isFinite(avg) || avg <= 0) return 1.0;
+  if (!isFinite(value) || value < 0) return 1.0;
+  return value / avg;
+}
+
+/**
+ * Compress a raw ratio toward 1.0 using a scale factor, then clamp.
+ * compressed = 1 + scale × (ratio − 1)
+ * This prevents extreme ratios from creating large multipliers.
+ */
+function _compressSignal(ratio, scale) {
+  const compressed = 1 + scale * (ratio - 1);
+  return Math.max(INTENT_CFG.clamp_lo, Math.min(INTENT_CFG.clamp_hi, compressed));
+}
+
+/**
+ * Compute the attack-intent multiplier for a team's last N matches.
+ *
+ * @param {string} teamName   - canonical team name
+ * @param {number} n          - sample size
+ * @param {number} alpha      - decay weight exponent
+ * @param {object} leagueAvgs - { avgXg, avgSot } from _leagueParams for this team's league
+ * @returns {{ multiplier, xgSignal, sotSignal, hasXg, hasSot }}
+ */
+function computeIntentMultiplier(teamName, n, alpha, leagueAvgs) {
+  const cfg = INTENT_CFG;
+  const all = getTeamMatches(teamName);
+
+  // Default: no adjustment
+  const neutral = { multiplier: 1.0, xgSignal: 1.0, sotSignal: 1.0, hasXg: false, hasSot: false };
+
+  if (!all.length) return neutral;
+  const sample = all.slice(-n);
+  const N = sample.length;
+  if (!N) return neutral;
+  const dw = decayWeights(N, alpha);
+
+  // ── Weighted averages of xG and SOT ──
+  let sumXg = 0, xgCount = 0;
+  let sumSot = 0, sotCount = 0;
+  for (let i = 0; i < N; i++) {
+    const m = sample[i], w = dw[i];
+    if (m.xg !== null && m.xg !== undefined && isFinite(m.xg)) { sumXg  += m.xg  * w; xgCount++; }
+    if (m.sot !== null && m.sot !== undefined && isFinite(m.sot)) { sumSot += m.sot * w; sotCount++; }
+  }
+  const hasXg  = xgCount  > 0;
+  const hasSot = sotCount > 0;
+
+  // ── Compute per-signal ratios ──
+  const avgXg  = leagueAvgs?.avgXg  || null;
+  const avgSot = leagueAvgs?.avgSot || null;
+
+  // xG signal: use if both team data and league average are available
+  let xgSignal = 1.0;
+  if (hasXg && avgXg !== null && avgXg > 0) {
+    const teamXg = sumXg; // already decay-weighted average
+    xgSignal = _compressSignal(_safeRatio(teamXg, avgXg), cfg.xg_scale);
+  }
+
+  // SOT signal: use if both team data and league average are available
+  let sotSignal = 1.0;
+  if (hasSot && avgSot !== null && avgSot > 0) {
+    const teamSot = sumSot;
+    sotSignal = _compressSignal(_safeRatio(teamSot, avgSot), cfg.sot_scale);
+  }
+
+  // ── Combine signals with very small epsilon weights ──
+  // intent_multiplier = 1 + ε_xg*(xgSig−1) + ε_sot*(sotSig−1)
+  const raw = 1
+    + cfg.epsilon_xg  * (xgSignal  - 1)
+    + cfg.epsilon_sot * (sotSignal - 1);
+
+  // Final clamp: ≈ ±5% max total adjustment
+  const multiplier = Math.max(cfg.mult_lo, Math.min(cfg.mult_hi, raw));
+
+  return {
+    multiplier: +multiplier.toFixed(5),
+    xgSignal:   +xgSignal.toFixed(4),
+    sotSignal:  +sotSignal.toFixed(4),
+    hasXg, hasSot
+  };
+}
+
+/**
+ * Mirror of computeIntentMultiplier using defensive signals (xGA, SOT_faced).
+ * Used to compute defense_multiplier that adjusts the OPPONENT's scoring rate.
+ */
+function computeDefenseMultiplier(teamName, n, alpha, leagueAvgs) {
+  const cfg = INTENT_CFG;
+  const all = getTeamMatches(teamName);
+
+  const neutral = { multiplier: 1.0, xgaSignal: 1.0, sotFacedSignal: 1.0, hasXga: false, hasSotFaced: false };
+
+  if (!all.length) return neutral;
+  const sample = all.slice(-n);
+  const N = sample.length;
+  if (!N) return neutral;
+  const dw = decayWeights(N, alpha);
+
+  let sumXga = 0, xgaCount = 0;
+  let sumSotF = 0, sotFCount = 0;
+  for (let i = 0; i < N; i++) {
+    const m = sample[i], w = dw[i];
+    if (m.xga !== null && m.xga !== undefined && isFinite(m.xga)) { sumXga  += m.xga  * w; xgaCount++; }
+    if (m.sot_faced !== null && m.sot_faced !== undefined && isFinite(m.sot_faced)) { sumSotF += m.sot_faced * w; sotFCount++; }
+  }
+  const hasXga     = xgaCount  > 0;
+  const hasSotFaced = sotFCount > 0;
+
+  const avgXg  = leagueAvgs?.avgXg  || null;
+  const avgSot = leagueAvgs?.avgSot || null;
+
+  // xGA signal: high xGA conceded → higher opponent scoring intent → multiplier > 1
+  let xgaSignal = 1.0;
+  if (hasXga && avgXg !== null && avgXg > 0) {
+    xgaSignal = _compressSignal(_safeRatio(sumXga, avgXg), cfg.xg_scale);
+  }
+
+  // SOT_faced signal: more shots faced → slightly more permissive defence
+  let sotFacedSignal = 1.0;
+  if (hasSotFaced && avgSot !== null && avgSot > 0) {
+    sotFacedSignal = _compressSignal(_safeRatio(sumSotF, avgSot), cfg.sot_scale);
+  }
+
+  const raw = 1
+    + cfg.epsilon_xg  * (xgaSignal      - 1)
+    + cfg.epsilon_sot * (sotFacedSignal  - 1);
+
+  const multiplier = Math.max(cfg.mult_lo, Math.min(cfg.mult_hi, raw));
+
+  return {
+    multiplier:     +multiplier.toFixed(5),
+    xgaSignal:      +xgaSignal.toFixed(4),
+    sotFacedSignal: +sotFacedSignal.toFixed(4),
+    hasXga, hasSotFaced
+  };
+}
+
+/**
+ * Resolve the league-level xG/SOT averages for a given team key.
+ * Reuses the same league-detection logic as buildTeamRatings.
+ */
+function _leagueAvgsForTeam(teamKey) {
+  const ct = {};
+  for (const [sh, rows] of Object.entries(histSheets)) {
+    if (!rows.length) continue;
+    const c = getCols(rows, C_HOME, C_AWAY, null, null);
+    if (!c || !c.home || !c.away) continue;
+    let count = 0;
+    for (const r of rows) {
+      const h = String(r[c.home]||'').toLowerCase().trim();
+      const a = String(r[c.away]||'').toLowerCase().trim();
+      if (h === teamKey || a === teamKey) count++;
+    }
+    if (count > 0) ct[divName(sh)] = (ct[divName(sh)]||0) + count;
+  }
+  const topLeague = Object.entries(ct).sort((a,b) => b[1]-a[1])[0];
+  if (!topLeague) return { avgXg: null, avgSot: null };
+  const lp = _leagueParams[topLeague[0]];
+  return lp ? { avgXg: lp.avgXg || null, avgSot: lp.avgSot || null } : { avgXg: null, avgSot: null };
+}
+
 function teamStats(name,n,alpha=1.0){
   const all=getTeamMatches(name);
   if(!all.length)return{name,found:false,rawMatches:[]};
@@ -2591,6 +2919,11 @@ function teamStats(name,n,alpha=1.0){
   const teamKey=canon?canon.toLowerCase():null;
   const dcRating=teamKey&&_teamRatings[teamKey]?_teamRatings[teamKey]:null;
 
+  // ── xG / SOT intent signals (small multiplicative nudge only) ──
+  const leagueAvgs = teamKey ? _leagueAvgsForTeam(teamKey) : { avgXg: null, avgSot: null };
+  const intentSig  = computeIntentMultiplier(name, n, alpha, leagueAvgs);
+  const defenseSig = computeDefenseMultiplier(name, n, alpha, leagueAvgs);
+
   return{
     name,found:true,N,totS,totC,cs,fts,
     lS:+lS.toFixed(4),   lC:+lC.toFixed(4),
@@ -2608,6 +2941,17 @@ function teamStats(name,n,alpha=1.0){
     attackRating:  dcRating?dcRating.attackRating:null,
     defenceRating: dcRating?dcRating.defenceRating:null,
     osiMode,
+    // xG / SOT intent signals — stored for use in calcFixture and drawer display
+    intentMultiplier:  intentSig.multiplier,
+    defenseMultiplier: defenseSig.multiplier,
+    xgSignal:          intentSig.xgSignal,
+    sotSignal:         intentSig.sotSignal,
+    xgaSignal:         defenseSig.xgaSignal,
+    sotFacedSignal:    defenseSig.sotFacedSignal,
+    hasXg:             intentSig.hasXg,
+    hasSot:            intentSig.hasSot,
+    hasXga:            defenseSig.hasXga,
+    hasSotFaced:       defenseSig.hasSotFaced,
     btts:+btts.toFixed(4),low:N<10,rawMatches:raw
   };
 }
@@ -2634,8 +2978,31 @@ function calcFixture(league,home,away,n,alpha=1.0,meta={}){
 
   // If DC model available, use its λ as the primary scoring rate
   // otherwise fall back to time-frequency-adjusted teamStats lS
-  const hLamDC = dcL ? dcL.lambdaHome : (H.found ? H.lS : null);
-  const aLamDC = dcL ? dcL.lambdaAway : (A.found ? A.lS : null);
+  const hLamDC_base = dcL ? dcL.lambdaHome : (H.found ? H.lS : null);
+  const aLamDC_base = dcL ? dcL.lambdaAway : (A.found ? A.lS : null);
+
+  // ── xG / SOT intent adjustment (STEP 7) ──────────────────────────────
+  // Apply AFTER the existing λ is computed — goals remain the dominant factor.
+  //
+  // λ_home_final = λ_home_base × intentHome × defenseAway
+  // λ_away_final = λ_away_base × intentAway × defenseHome
+  //
+  // intentHome  = home team's attack intent multiplier (xG + SOT nudge)
+  // defenseAway = away team's defensive permissiveness (xGA + SOT_faced nudge)
+  //
+  // If neither team has xG or SOT data → both multipliers = 1.0 → exact original λ.
+  // ─────────────────────────────────────────────────────────────────────
+  const intentHome  = H.found ? (H.intentMultiplier  || 1.0) : 1.0;
+  const defenseAway = A.found ? (A.defenseMultiplier || 1.0) : 1.0;
+  const intentAway  = A.found ? (A.intentMultiplier  || 1.0) : 1.0;
+  const defenseHome = H.found ? (H.defenseMultiplier || 1.0) : 1.0;
+
+  const hLamDC = hLamDC_base !== null
+    ? +Math.max(0.3, Math.min(4.0, hLamDC_base * intentHome * defenseAway)).toFixed(4)
+    : null;
+  const aLamDC = aLamDC_base !== null
+    ? +Math.max(0.3, Math.min(4.0, aLamDC_base * intentAway * defenseHome)).toFixed(4)
+    : null;
 
   // Estimate rho from combined match history for this fixture
   // Merges home+away records for a league-level rho estimate
@@ -2689,7 +3056,7 @@ function calcFixture(league,home,away,n,alpha=1.0,meta={}){
   // ── Confidence ──
   const conf = calcConfidence(H, A, mBTTS, ensBTTS, eloProbs, formH, formA, cw);
 
-  // ── Conservative O/U Filter — use DC λ when available for better accuracy ──
+  // ── Conservative O/U Filter — use intent-adjusted DC λ for better accuracy ──
   const lambdaTotal = (hLamDC!==null&&aLamDC!==null) ? +(hLamDC + aLamDC).toFixed(4)
                     : (H.found && A.found) ? +(H.lS + A.lS).toFixed(4) : null;
   const conservOU   = lambdaTotal !== null ? calcConservativeOU(lambdaTotal) : { under15: 0, over35: 0 };
@@ -2707,7 +3074,18 @@ function calcFixture(league,home,away,n,alpha=1.0,meta={}){
     mBTTS_raw: mBTTS_raw !== null ? +mBTTS_raw.toFixed(4) : null,
     mBTTS_adj: mBTTS_adj !== null ? +mBTTS_adj.toFixed(4) : null,
     rho: +rho.toFixed(4),
-    dcLambdas: dcL,           // { lambdaHome, lambdaAway, homeAdvFactor, leagueAvg } or null
+    // dcLambdas now reflects intent-adjusted values; store base for transparency
+    dcLambdas: dcL ? {
+      ...dcL,
+      lambdaHome: hLamDC,
+      lambdaAway: aLamDC,
+      lambdaHomeBase: hLamDC_base,
+      lambdaAwayBase: aLamDC_base,
+      intentHome:  +intentHome.toFixed(4),
+      defenseAway: +defenseAway.toFixed(4),
+      intentAway:  +intentAway.toFixed(4),
+      defenseHome: +defenseHome.toFixed(4)
+    } : null,
     eloProbs, formH, formA,
     ensBTTS: ensBTTS !== null ? +ensBTTS.toFixed(4) : null,
     ensOutcomes,
@@ -2863,6 +3241,12 @@ document.getElementById('runBtn').addEventListener('click',async()=>{
     _teamRatings=buildTeamRatings(n,_leagueParams,alpha);
     const lpNames=Object.keys(_leagueParams);
     log(`Strength model: ${Object.keys(_teamRatings).length} team ratings · ${lpNames.length} league(s) · home adv: ${lpNames.map(l=>l+' ×'+_leagueParams[l].homeAdvFactor.toFixed(3)).join(', ')}`,'ok');
+    // Report xG / SOT data availability
+    const xgLeagues  = lpNames.filter(l => _leagueParams[l].avgXg  !== null);
+    const sotLeagues = lpNames.filter(l => _leagueParams[l].avgSot !== null);
+    if (xgLeagues.length)  log(`xG data: ${xgLeagues.length} league(s) detected — intent signals active (ε=${INTENT_CFG.epsilon_xg})`,'ok');
+    if (sotLeagues.length) log(`SOT data: ${sotLeagues.length} league(s) detected — aggression signals active (ε=${INTENT_CFG.epsilon_sot})`,'ok');
+    if (!xgLeagues.length && !sotLeagues.length) log('No xG/SOT columns found — intent signals inactive (goals-only mode, backward compatible)','ok');
 
     // Phase 3 — Elo
     setProgress(40,'Building Elo ratings…');
@@ -3241,7 +3625,32 @@ function ensembleSection(r) {
   const ensBTTS= r.ensBTTS !== null ? (r.ensBTTS*100).toFixed(1)+'%' : '—';
   const rhoDisp = r.rho !== undefined ? r.rho.toFixed(3) : '—';
 
-  // DC λ display
+  // DC λ display — now includes intent adjustment transparency
+  const hasIntent = r.dcLambdas && (r.dcLambdas.intentHome !== undefined) &&
+    (r.dcLambdas.intentHome !== 1 || r.dcLambdas.defenseAway !== 1 ||
+     r.dcLambdas.intentAway !== 1 || r.dcLambdas.defenseHome !== 1);
+  const intentBadge = hasIntent ? `
+    <div style="margin-top:10px;padding:9px 11px;background:rgba(0,229,160,.05);border:1px solid rgba(0,229,160,.15);border-radius:7px">
+      <div style="font-family:var(--mono);font-size:.5rem;letter-spacing:1.5px;text-transform:uppercase;color:#00e5a0;margin-bottom:7px">🎯 xG / SOT Intent Adjustment</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div style="font-family:var(--mono);font-size:.6rem">
+          <div style="color:var(--t3);margin-bottom:3px">HOME attack intent</div>
+          <div>xG sig: <b style="color:${r.dcLambdas.intentHome>=1?'var(--accent)':'var(--a2)'}">${r.dcLambdas.intentHome?.toFixed(4)??'—'}</b></div>
+          <div>Def away: <b style="color:${r.dcLambdas.defenseAway>=1?'var(--accent)':'var(--a2)'}">${r.dcLambdas.defenseAway?.toFixed(4)??'—'}</b></div>
+          <div style="margin-top:4px">λ base→final: <b style="color:var(--t1)">${r.dcLambdas.lambdaHomeBase?.toFixed(3)??'—'}</b> → <b style="color:var(--accent)">${r.dcLambdas.lambdaHome?.toFixed(3)??'—'}</b></div>
+        </div>
+        <div style="font-family:var(--mono);font-size:.6rem">
+          <div style="color:var(--t3);margin-bottom:3px">AWAY attack intent</div>
+          <div>xG sig: <b style="color:${r.dcLambdas.intentAway>=1?'var(--accent)':'var(--a2)'}">${r.dcLambdas.intentAway?.toFixed(4)??'—'}</b></div>
+          <div>Def home: <b style="color:${r.dcLambdas.defenseHome>=1?'var(--accent)':'var(--a2)'}">${r.dcLambdas.defenseHome?.toFixed(4)??'—'}</b></div>
+          <div style="margin-top:4px">λ base→final: <b style="color:var(--t1)">${r.dcLambdas.lambdaAwayBase?.toFixed(3)??'—'}</b> → <b style="color:var(--a3)">${r.dcLambdas.lambdaAway?.toFixed(3)??'—'}</b></div>
+        </div>
+      </div>
+    </div>` : (r.H.found && r.A.found && !r.H.hasXg && !r.H.hasSot && !r.A.hasXg && !r.A.hasSot) ? `
+    <div style="margin-top:8px;padding:7px 10px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:6px;font-family:var(--mono);font-size:.55rem;color:var(--t3)">
+      ⚪ No xG/SOT data — intent signals inactive (goal-only mode)
+    </div>` : '';
+
   const dcSection = r.dcLambdas ? `
   <div style="margin-bottom:18px;padding:12px;background:rgba(123,140,255,.06);border:1px solid rgba(123,140,255,.2);border-radius:10px">
     <div style="font-family:var(--mono);font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:#7b8cff;margin-bottom:10px">⚖ Attack / Defence Model</div>
@@ -3262,6 +3671,7 @@ function ensembleSection(r) {
       <span>Home adv: <b style="color:var(--t1)">×${r.dcLambdas.homeAdvFactor.toFixed(3)}</b></span>
       <span>Away adv: <b style="color:var(--t1)">×${r.dcLambdas.awayAdvFactor.toFixed(3)}</b></span>
     </div>
+    ${intentBadge}
   </div>` : '';
 
   const hWin  = r.eloProbs ? (r.eloProbs.homeWin*100).toFixed(1)+'%' : '—';
@@ -3451,6 +3861,29 @@ function teamSection(T,label){
     ⚠ Too few dated matches for frequency adjustment (min ${FREQ_CONFIG.minMatches})
   </div>` : '');
 
+  // ── xG / SOT intent signal panel ───────────────────────────────────────
+  const hasIntentData = T.hasXg || T.hasSot || T.hasXga || T.hasSotFaced;
+  const intentPanel = hasIntentData ? `
+  <div style="margin:10px 0;padding:11px 12px;background:rgba(0,229,160,.04);border:1px solid rgba(0,229,160,.14);border-radius:8px">
+    <div style="font-family:var(--mono);font-size:.5rem;letter-spacing:2px;text-transform:uppercase;color:#00e5a0;margin-bottom:8px">🎯 xG / SOT Intent Signals</div>
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:7px;margin-bottom:7px">
+      <div style="text-align:center;padding:7px;background:rgba(0,0,0,.25);border-radius:6px">
+        <div style="font-family:var(--mono);font-size:.85rem;font-weight:700;color:${T.intentMultiplier>=1?'var(--accent)':'var(--a2)'}">${(T.intentMultiplier||1).toFixed(4)}</div>
+        <div style="font-size:.52rem;color:var(--t3);margin-top:2px">Attack Intent ×λ</div>
+      </div>
+      <div style="text-align:center;padding:7px;background:rgba(0,0,0,.25);border-radius:6px">
+        <div style="font-family:var(--mono);font-size:.85rem;font-weight:700;color:${T.defenseMultiplier>=1?'var(--a2)':'var(--accent)'}">${(T.defenseMultiplier||1).toFixed(4)}</div>
+        <div style="font-size:.52rem;color:var(--t3);margin-top:2px">Defence Perm. ×opp</div>
+      </div>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:10px;font-family:var(--mono);font-size:.55rem;color:var(--t3)">
+      ${T.hasXg  ? `<span>xG sig: <b style="color:var(--t1)">${T.xgSignal?.toFixed(4)??'—'}</b></span>` : '<span style="opacity:.5">xG: N/A</span>'}
+      ${T.hasSot ? `<span>SOT sig: <b style="color:var(--t1)">${T.sotSignal?.toFixed(4)??'—'}</b></span>` : '<span style="opacity:.5">SOT: N/A</span>'}
+      ${T.hasXga       ? `<span>xGA sig: <b style="color:var(--t1)">${T.xgaSignal?.toFixed(4)??'—'}</b></span>` : '<span style="opacity:.5">xGA: N/A</span>'}
+      ${T.hasSotFaced  ? `<span>SOT-faced: <b style="color:var(--t1)">${T.sotFacedSignal?.toFixed(4)??'—'}</b></span>` : '<span style="opacity:.5">SOT-faced: N/A</span>'}
+    </div>
+  </div>` : '';
+
   return`<div class="dts">
     <div class="dts-hd">
       <div class="dts-name">${T.name} <span style="color:var(--t3);font-weight:400">(${label})</span></div>
@@ -3465,6 +3898,7 @@ function teamSection(T,label){
       <div class="dts-s"><span class="dts-sv" style="color:${T.form!==null?scoreCol(T.form):'var(--t1)'}">${T.form!==null?T.form.toFixed(1):'—'}</span><span class="dts-sk">Form Score</span></div>
     </div>
     ${freqSection}
+    ${intentPanel}
     <table class="ht">
       <thead><tr><th>Date</th><th>H/A</th><th>Opponent</th><th>Score</th><th>CS</th><th>Sample</th></tr></thead>
       <tbody>${rows}</tbody>
@@ -3477,8 +3911,8 @@ function teamSection(T,label){
 // ═══════════════════════════════════════════════
 document.getElementById('csvBtn').addEventListener('click',()=>{
   if(!visRows.length)return;
-  const hdr=['League','Fixture','Home','Away','Home N','Home λ Scr','Home λ Con','Home CS','Home BTTS%','Away N','Away λ Scr','Away λ Con','Away CS','Away BTTS%','Match BTTS%','Home Form','Away Form','Form Diff'];
-  const body=visRows.map(r=>{const H=r.H,A=r.A;return[r.league,`"${r.fixture}"`,`"${r.home}"`,`"${r.away}"`,H.found?H.N:'',H.found?H.lS:'',H.found?H.lC:'',H.found?H.cs:'',H.found?(H.btts*100).toFixed(1):'',A.found?A.N:'',A.found?A.lS:'',A.found?A.lC:'',A.found?A.cs:'',A.found?(A.btts*100).toFixed(1):'',r.mBTTS!==null?(r.mBTTS*100).toFixed(1):'',H.form!==null?H.form:'',A.form!==null?A.form:'',r.formDiff!==null?r.formDiff:''].join(',');});
+  const hdr=['League','Fixture','Home','Away','Home N','Home λ Scr','Home λ Con','Home CS','Home BTTS%','Away N','Away λ Scr','Away λ Con','Away CS','Away BTTS%','Match BTTS%','Home Form','Away Form','Form Diff','Home xG Sig','Home SOT Sig','Away xG Sig','Away SOT Sig','Intent H','Intent A'];
+  const body=visRows.map(r=>{const H=r.H,A=r.A;return[r.league,`"${r.fixture}"`,`"${r.home}"`,`"${r.away}"`,H.found?H.N:'',H.found?H.lS:'',H.found?H.lC:'',H.found?H.cs:'',H.found?(H.btts*100).toFixed(1):'',A.found?A.N:'',A.found?A.lS:'',A.found?A.lC:'',A.found?A.cs:'',A.found?(A.btts*100).toFixed(1):'',r.mBTTS!==null?(r.mBTTS*100).toFixed(1):'',H.form!==null?H.form:'',A.form!==null?A.form:'',r.formDiff!==null?r.formDiff:'',H.found?(H.xgSignal||1).toFixed(4):'',H.found?(H.sotSignal||1).toFixed(4):'',A.found?(A.xgSignal||1).toFixed(4):'',A.found?(A.sotSignal||1).toFixed(4):'',H.found?(H.intentMultiplier||1).toFixed(4):'',A.found?(A.intentMultiplier||1).toFixed(4):''].join(',');});
   const blob=new Blob([[hdr.join(','),...body].join('\n')],{type:'text/csv'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='football_predictions.csv';a.click();
 });
