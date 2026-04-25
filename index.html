@@ -1003,46 +1003,44 @@ img,video,svg{max-width:100%;height:auto}
 // ═══════════════════════════════════════════════
 const DRIVE_FOLDER_ID = '1FSKEeRH22QXiPPNZ6FmTtC1yuQqKkCtK';
 
-// ─────────────────────────────────────────────────────────────
-// HISTORICAL DATA FILES — scales dynamically from 8 → 16
+// ─────────────────────────────────────────────────────────────────────
+// HISTORICAL DATA FILES
 //
-// Core named files come first; numbered slot files fill the rest
-// up to TOTAL_DATA_FILES. Add extra named entries to NAMED_FILES
-// to override a numbered slot, or just increase TOTAL_DATA_FILES.
-// ─────────────────────────────────────────────────────────────
-const TOTAL_DATA_FILES = 16; // ← change this number to scale up or down
+// 16 files across four tiers. Edit names here if files are renamed.
+// loadFromDrive() fetches all of them in parallel from DRIVE_FOLDER_ID.
+//
+// Tier 1 — Heavy Elite (4 files)   England top/mid/low + Brazil/Argentina
+// Tier 2 — Medium Elite (6 files)  Western, Central, Southern, Northern,
+//                                  Misc and Alpine European leagues
+// Tier 3 — Global Elite (2 files)  Americas (MLS/Mexico/Chile) + Asia/ME
+// Tier 4 — Normals / FT (4 files)  Lower-tier Europe, Americas, Global,
+//                                  and Youth/U21 leagues
+// ─────────────────────────────────────────────────────────────────────
+const DRIVE_HIST_FILES = [
+  // ── Tier 1: Heavy Elite ──────────────────────────────────────────
+  'Elite_Eng_Top.xlsx',   // Premier League & Championship
+  'Elite_Eng_Mid.xlsx',   // League 1 & League 2
+  'Elite_Eng_Low.xlsx',   // National League & North/South
+  'Elite_Bra_Arg.xlsx',   // Brazil Serie A & Argentina Liga Profesional
 
-/** Named core files — always included, in order */
-const NAMED_HIST_FILES = [
-  'Europe_Results_A.xlsx',
-  'Europe_Results_B.xlsx',
-  'Africa_Results.xlsx',
-  'Americas_Results.xlsx',
-  'Asia_ME_CIS_Results.xlsx',
-  'International_Competitions.xlsx',
-  'Daily_Patch.xlsx',
+  // ── Tier 2: Medium Elite ─────────────────────────────────────────
+  'Elite_EU_West.xlsx',   // Spain (La Liga 1 & 2) and France (Ligue 1)
+  'Elite_EU_Cent.xlsx',   // France (Ligue 2) and Germany (Bundesliga 1 & 2)
+  'Elite_EU_South.xlsx',  // Italy (Serie A & B) and Portugal
+  'Elite_EU_North.xlsx',  // Netherlands (Eredivisie 1 & 2) and Belgium
+  'Elite_EU_Misc.xlsx',   // Scotland (1 & 2) and Turkey
+  'Elite_EU_Alps.xlsx',   // Greece, Austria, and Switzerland
+
+  // ── Tier 3: Global Elite ─────────────────────────────────────────
+  'Elite_Americas.xlsx',  // USA (MLS), Mexico, and Chile
+  'Elite_Asia_ME.xlsx',   // Japan, South Korea, and Saudi Arabia
+
+  // ── Tier 4: Normals (FT) ─────────────────────────────────────────
+  'Normal_Europe.xlsx',   // 7 lower-tier European leagues
+  'Normal_Americas.xlsx', // 6 secondary Americas leagues
+  'Normal_Global.xlsx',   // 8 leagues (Africa, SE Asia, Middle East)
+  'Normal_Youth.xlsx',    // 4 Youth/U21 leagues
 ];
-
-/**
- * buildHistFileList()
- * Combines named core files with dynamically-generated slot files
- * (Data_08.xlsx … Data_16.xlsx) to reach TOTAL_DATA_FILES entries.
- * Files are de-duplicated; order is preserved.
- */
-function buildHistFileList() {
-  const files = [...NAMED_HIST_FILES];
-  let slot = NAMED_HIST_FILES.length + 1; // next slot number after named files
-  while (files.length < TOTAL_DATA_FILES) {
-    // Pad slot number to two digits for consistent sorting (e.g. 08, 09, 10 …)
-    const padded = String(slot).padStart(2, '0');
-    files.push(`Data_${padded}.xlsx`);
-    slot++;
-  }
-  return files;
-}
-
-/** Final list used by loadFromDrive() — 16 entries total */
-const DRIVE_HIST_FILES = buildHistFileList();
 
 // Fixtures file — loaded into fixSheets (replaces manual upload)
 const DRIVE_FIX_FILE = 'Upcoming_Fixtures.xlsx';
