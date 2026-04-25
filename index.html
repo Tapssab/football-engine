@@ -574,6 +574,98 @@ img,video,svg{max-width:100%;height:auto}
 .lo-track{width:320px;max-width:80vw;height:6px;background:var(--glass);border-radius:3px;overflow:hidden;}
 .lo-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--accent),#00b8ff);border-radius:3px;transition:width .35s cubic-bezier(.4,0,.2,1);}
 .lo-count{font-family:var(--mono);font-size:.58rem;color:var(--t3);letter-spacing:.5px;}
+/* ═══════════════════════════════════════════
+   MANUAL FIXTURE INPUT
+   ═══════════════════════════════════════════ */
+.mfi-form{display:flex;flex-direction:column;gap:6px;margin-top:6px}
+.mfi-input{
+  background:var(--sb2,#1a1a2e);
+  border:1px solid var(--gb,rgba(255,255,255,.08));
+  border-radius:6px;
+  color:var(--t1,#e8e8f0);
+  font-size:.72rem;
+  padding:7px 10px;
+  outline:none;
+  transition:border-color .15s;
+  width:100%;
+  box-sizing:border-box;
+}
+.mfi-input:focus{border-color:var(--accent,#00e5a0);}
+.mfi-input::placeholder{color:var(--t3,#5a5a78);}
+.mfi-input.mfi-date{color-scheme:dark;cursor:pointer;}
+.mfi-add-btn{
+  background:var(--accent,#00e5a0);
+  border:none;
+  border-radius:6px;
+  color:#0a0a14;
+  cursor:pointer;
+  font-size:.72rem;
+  font-weight:700;
+  padding:8px 0;
+  text-align:center;
+  transition:opacity .15s, transform .1s;
+  width:100%;
+}
+.mfi-add-btn:hover{opacity:.85;}
+.mfi-add-btn:active{transform:scale(.97);}
+/* Feedback message under the form */
+.mfi-msg{
+  font-family:var(--mono,monospace);
+  font-size:.6rem;
+  margin-top:2px;
+  min-height:14px;
+  transition:color .2s;
+}
+.mfi-msg.ok {color:var(--accent,#00e5a0);}
+.mfi-msg.err{color:var(--a2,#ff4d6d);}
+/* Fixture list */
+.mfi-list{margin-top:8px;}
+.mfi-list-hd{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  font-family:var(--mono,monospace);
+  font-size:.58rem;
+  color:var(--t3,#5a5a78);
+  border-bottom:1px solid var(--gb,rgba(255,255,255,.06));
+  padding-bottom:5px;
+  margin-bottom:5px;
+}
+.mfi-clear-btn{
+  background:none;
+  border:1px solid var(--gb,rgba(255,255,255,.1));
+  border-radius:4px;
+  color:var(--a2,#ff4d6d);
+  cursor:pointer;
+  font-size:.55rem;
+  padding:2px 6px;
+}
+.mfi-clear-btn:hover{background:rgba(255,77,109,.1);}
+/* Individual fixture row */
+.mfi-item{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  padding:5px 7px;
+  background:rgba(0,229,160,.04);
+  border:1px solid rgba(0,229,160,.1);
+  border-radius:5px;
+  margin-bottom:4px;
+  font-size:.65rem;
+}
+.mfi-item-fix{flex:1;color:var(--t1,#e8e8f0);font-weight:600;}
+.mfi-item-date{font-family:var(--mono,monospace);color:var(--t3,#5a5a78);font-size:.58rem;}
+.mfi-item-del{
+  background:none;
+  border:none;
+  color:var(--a2,#ff4d6d);
+  cursor:pointer;
+  font-size:.7rem;
+  line-height:1;
+  padding:2px 4px;
+  border-radius:3px;
+}
+.mfi-item-del:hover{background:rgba(255,77,109,.15);}
 </style>
 </head>
 <body>
@@ -709,6 +801,51 @@ img,video,svg{max-width:100%;height:auto}
         Refresh Fixtures from Drive
       </button>
       <div class="drive-status" id="driveFixStatus"></div>
+    </div>
+
+    <div>
+      <div class="sb-hd">Manual Fixture Input</div>
+
+      <!-- Input form: Home, Away, Date, Add button -->
+      <div class="mfi-form">
+        <input
+          type="text"
+          id="mfiHome"
+          class="mfi-input"
+          placeholder="Home Team"
+          autocomplete="off"
+          spellcheck="false"
+        >
+        <input
+          type="text"
+          id="mfiAway"
+          class="mfi-input"
+          placeholder="Away Team"
+          autocomplete="off"
+          spellcheck="false"
+        >
+        <input
+          type="date"
+          id="mfiDate"
+          class="mfi-input mfi-date"
+          title="Match date"
+        >
+        <button class="mfi-add-btn" id="mfiAddBtn" onclick="addManualFixture()">
+          ＋ Add Fixture
+        </button>
+      </div>
+
+      <!-- Inline validation / feedback message -->
+      <div class="mfi-msg" id="mfiMsg"></div>
+
+      <!-- List of added fixtures (hidden until at least one is added) -->
+      <div id="mfiList" class="mfi-list" style="display:none">
+        <div class="mfi-list-hd">
+          <span id="mfiCount">0 manual fixture(s)</span>
+          <button class="mfi-clear-btn" onclick="clearManualFixtures()">Clear all</button>
+        </div>
+        <div id="mfiItems"></div>
+      </div>
     </div>
 
     <div>
@@ -941,8 +1078,17 @@ img,video,svg{max-width:100%;height:auto}
 // ═══════════════════════════════════════════════
 const DRIVE_FOLDER_ID = '1FSKEeRH22QXiPPNZ6FmTtC1yuQqKkCtK';
 
-// Historical results files — loaded into histSheets
-const DRIVE_HIST_FILES = [
+// ─────────────────────────────────────────────────────────────
+// HISTORICAL DATA FILES — scales dynamically from 8 → 16
+//
+// Core named files come first; numbered slot files fill the rest
+// up to TOTAL_DATA_FILES. Add extra named entries to NAMED_FILES
+// to override a numbered slot, or just increase TOTAL_DATA_FILES.
+// ─────────────────────────────────────────────────────────────
+const TOTAL_DATA_FILES = 16; // ← change this number to scale up or down
+
+/** Named core files — always included, in order */
+const NAMED_HIST_FILES = [
   'Europe_Results_A.xlsx',
   'Europe_Results_B.xlsx',
   'Africa_Results.xlsx',
@@ -951,6 +1097,27 @@ const DRIVE_HIST_FILES = [
   'International_Competitions.xlsx',
   'Daily_Patch.xlsx',
 ];
+
+/**
+ * buildHistFileList()
+ * Combines named core files with dynamically-generated slot files
+ * (Data_08.xlsx … Data_16.xlsx) to reach TOTAL_DATA_FILES entries.
+ * Files are de-duplicated; order is preserved.
+ */
+function buildHistFileList() {
+  const files = [...NAMED_HIST_FILES];
+  let slot = NAMED_HIST_FILES.length + 1; // next slot number after named files
+  while (files.length < TOTAL_DATA_FILES) {
+    // Pad slot number to two digits for consistent sorting (e.g. 08, 09, 10 …)
+    const padded = String(slot).padStart(2, '0');
+    files.push(`Data_${padded}.xlsx`);
+    slot++;
+  }
+  return files;
+}
+
+/** Final list used by loadFromDrive() — 16 entries total */
+const DRIVE_HIST_FILES = buildHistFileList();
 
 // Fixtures file — loaded into fixSheets (replaces manual upload)
 const DRIVE_FIX_FILE = 'Upcoming_Fixtures.xlsx';
@@ -996,7 +1163,42 @@ async function driveDownloadFile(filename, token) {
   return { sheets, modified };
 }
 
-// ── Main Drive load — historical results ───────────────────────────
+// ─────────────────────────────────────────────────────────────────────────
+// MERGED DATASET
+// All data from all 16 loaded files is combined into this single structure
+// after every Drive load. Shape: { byTeam: {teamKey → [matches]},
+//                                   flat:   [all rows across all sheets],
+//                                   meta:   {filename → {sheets, modified}} }
+// Prediction logic can read mergedDataset.byTeam or mergedDataset.flat.
+// ─────────────────────────────────────────────────────────────────────────
+let mergedDataset = { byTeam: {}, flat: [], meta: {} };
+
+/**
+ * buildMergedDataset()
+ * Rebuilds mergedDataset from histSheets + matchStore after every load.
+ * Called automatically by rebuildIndex().
+ */
+function buildMergedDataset() {
+  // flat: every raw row from every sheet (for generic analysis)
+  const flat = [];
+  for (const [key, rows] of Object.entries(histSheets)) {
+    for (const row of rows) {
+      flat.push({ _source: key, ...row });
+    }
+  }
+
+  // byTeam: mirrors matchStore but exposed on mergedDataset for external use
+  const byTeam = {};
+  for (const [teamKey, matches] of Object.entries(matchStore)) {
+    byTeam[teamKey] = [...matches]; // shallow copy; safe to iterate
+  }
+
+  mergedDataset.flat   = flat;
+  mergedDataset.byTeam = byTeam;
+  // meta is populated incrementally during loading (see loadFromDrive)
+}
+
+// ── Main Drive load — historical results (parallel fetch for all 16 files) ──
 async function loadFromDrive() {
   const btn = document.getElementById('driveBtn');
   btn.disabled = true;
@@ -1007,46 +1209,74 @@ async function loadFromDrive() {
       await loadScript('https://accounts.google.com/gsi/client');
     }
     driveAccessToken = await getGoogleAccessToken();
-    driveStatus('Connected — fetching historical files…', 'loading');
+    driveStatus(`Connected — fetching ${DRIVE_HIST_FILES.length} files in parallel…`, 'loading');
+    log(`Drive: queuing ${DRIVE_HIST_FILES.length} file fetch(es) asynchronously…`);
 
+    // ── Fetch all files concurrently with individual error handling ──
+    // Promise.allSettled ensures one failure never blocks the others.
+    const fetchTasks = DRIVE_HIST_FILES.map(filename =>
+      driveDownloadFile(filename, driveAccessToken)
+        .then(result => ({ filename, result, ok: true }))
+        .catch(err   => ({ filename, result: null, ok: false, err }))
+    );
+
+    const outcomes = await Promise.allSettled(fetchTasks);
     let loaded = 0;
     const errors = [];
 
-    for (const filename of DRIVE_HIST_FILES) {
-      try {
-        log(`Drive: fetching ${filename}…`);
-        const result = await driveDownloadFile(filename, driveAccessToken);
-        if (!result) {
-          log(`Drive: ${filename} not found in folder — skipping`, 'err');
-          continue;
-        }
-        // Replace if already loaded
-        if (loadedFiles.includes(filename)) {
-          Object.keys(histSheets).filter(k => k.startsWith(filename + '::')).forEach(k => delete histSheets[k]);
-          loadedFiles.splice(loadedFiles.indexOf(filename), 1);
-        }
-        for (const [sh, rows] of Object.entries(result.sheets)) {
-          histSheets[`${filename}::${sh}`] = rows;
-        }
-        loadedFiles.push(filename);
-        loaded++;
-        log(`✓ Drive: ${filename} (updated ${result.modified})`, 'ok');
-      } catch (e) {
+    for (const outcome of outcomes) {
+      // Promise.allSettled wraps our already-caught promises; value is always present
+      const { filename, result, ok, err } = outcome.value || {};
+
+      if (!ok) {
         errors.push(filename);
-        log(`Drive error — ${filename}: ${e.message}`, 'err');
+        log(`Drive error — ${filename}: ${err ? err.message : 'unknown error'}`, 'err');
+        continue;
       }
+      if (!result) {
+        // File not found in folder — not an error, just skip
+        log(`Drive: ${filename} not found in folder — skipping`);
+        continue;
+      }
+
+      // Replace stale copy if previously loaded
+      if (loadedFiles.includes(filename)) {
+        Object.keys(histSheets)
+          .filter(k => k.startsWith(filename + '::'))
+          .forEach(k => delete histSheets[k]);
+        loadedFiles.splice(loadedFiles.indexOf(filename), 1);
+      }
+
+      // Store sheets under "filename::sheetName" namespace key
+      for (const [sh, rows] of Object.entries(result.sheets)) {
+        histSheets[`${filename}::${sh}`] = rows;
+      }
+      loadedFiles.push(filename);
+
+      // Record file metadata for mergedDataset.meta
+      mergedDataset.meta[filename] = {
+        modified: result.modified,
+        sheets:   Object.keys(result.sheets).length,
+        rows:     Object.values(result.sheets).reduce((s, r) => s + r.length, 0),
+      };
+
+      loaded++;
+      log(`✓ Drive: ${filename} — ${mergedDataset.meta[filename].sheets} sheet(s), ${mergedDataset.meta[filename].rows} rows (updated ${result.modified})`, 'ok');
     }
 
-    rebuildIndex();
+    // Rebuild search indices + merged dataset
+    rebuildIndex(); // also calls buildMergedDataset() via hook below
     renderFileList();
 
     if (loaded > 0) {
-      driveStatus(`✓ ${loaded} file${loaded>1?'s':''} loaded from Drive`, 'ok');
-      log(`Drive sync complete — ${Object.keys(masterIdx).length} teams indexed`, 'ok');
+      const errNote = errors.length ? ` (${errors.length} file(s) failed)` : '';
+      driveStatus(`✓ ${loaded}/${DRIVE_HIST_FILES.length} file(s) loaded from Drive${errNote}`, loaded === DRIVE_HIST_FILES.length ? 'ok' : 'loading');
+      log(`Drive sync complete — ${Object.keys(masterIdx).length} teams · ${mergedDataset.flat.length} total rows in merged dataset`, 'ok');
+      if (errors.length) log(`⚠ Failed files: ${errors.join(', ')}`, 'err');
       // Auto-load fixtures after history is ready
       await loadFixturesFromDrive(false);
     } else {
-      driveStatus('No history files found — run Apps Script bulk download first', 'err');
+      driveStatus('No history files found — check folder ID or run Apps Script', 'err');
     }
 
   } catch (e) {
@@ -3112,6 +3342,8 @@ function parseFile(f){
 function rebuildIndex(){
   masterIdx=buildMasterIndex(histSheets);
   matchStore=buildMatchStore(histSheets,masterIdx);
+  // Rebuild merged dataset every time new data is loaded
+  buildMergedDataset();
   document.getElementById('ts-files').textContent=loadedFiles.length;
   document.getElementById('ts-teams').textContent=Object.keys(masterIdx).length;
   checkReady();
@@ -3938,7 +4170,6 @@ document.getElementById('gamesBtn').addEventListener('click',()=>{
   handle.addEventListener('mousedown', e=>{
     e.preventDefault();
     startX = e.clientX;
-    // current width from CSS variable or default
     startW = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--fix-w')) || 200;
     handle.classList.add('dragging');
     const onMove = e=>{
@@ -3955,6 +4186,210 @@ document.getElementById('gamesBtn').addEventListener('click',()=>{
     document.addEventListener('mouseup', onUp);
   });
 })();
+
+// ═══════════════════════════════════════════════════════════════════
+// ───────────────────────────────────────────────────────────────────
+// manualFixtures[] is the source of truth for user-entered fixtures.
+// Each entry shape: { home, away, date }
+//
+// When Run Analysis fires, injectManualFixtures() converts the array
+// into a fixSheets-compatible sheet so calcFixture() can process them
+// alongside any Drive fixtures that were loaded.
+//
+// Integration point with prediction logic:
+//   • fixSheets['__manual__'] = rows from manualFixtures
+//   • mergedDataset is available globally for any extra analysis
+// ═══════════════════════════════════════════════════════════════════
+
+/** In-memory store for manually entered fixtures */
+let manualFixtures = [];
+
+/**
+ * addManualFixture()
+ * Reads the three input fields, validates them, pushes to manualFixtures[],
+ * updates the UI list, clears fields, and calls checkReady().
+ */
+function addManualFixture() {
+  const homeEl = document.getElementById('mfiHome');
+  const awayEl = document.getElementById('mfiAway');
+  const dateEl = document.getElementById('mfiDate');
+  const msgEl  = document.getElementById('mfiMsg');
+
+  const home = homeEl.value.trim();
+  const away = awayEl.value.trim();
+  const date = dateEl.value; // YYYY-MM-DD from <input type="date">
+
+  // ── Validation ──
+  if (!home) {
+    showMfiMsg('Please enter a Home Team name.', 'err');
+    homeEl.focus();
+    return;
+  }
+  if (!away) {
+    showMfiMsg('Please enter an Away Team name.', 'err');
+    awayEl.focus();
+    return;
+  }
+  if (home.toLowerCase() === away.toLowerCase()) {
+    showMfiMsg('Home and Away teams must be different.', 'err');
+    awayEl.focus();
+    return;
+  }
+
+  // Check for duplicate fixture
+  const isDupe = manualFixtures.some(
+    f => f.home.toLowerCase() === home.toLowerCase() &&
+         f.away.toLowerCase() === away.toLowerCase()
+  );
+  if (isDupe) {
+    showMfiMsg(`"${home} vs ${away}" is already in the list.`, 'err');
+    return;
+  }
+
+  // Push to array
+  const fixture = { home, away, date };
+  manualFixtures.push(fixture);
+
+  // Clear inputs (keep date so back-to-back entries on same day are quick)
+  homeEl.value = '';
+  awayEl.value = '';
+  homeEl.focus();
+
+  // Refresh UI
+  renderManualFixtureList();
+  injectManualFixtures(); // sync into fixSheets immediately
+  showMfiMsg(`✓ Added: ${home} vs ${away}`, 'ok');
+  checkReady();
+}
+
+/**
+ * removeManualFixture(index)
+ * Removes the fixture at [index] from manualFixtures[] and refreshes UI.
+ */
+function removeManualFixture(index) {
+  manualFixtures.splice(index, 1);
+  renderManualFixtureList();
+  injectManualFixtures();
+  checkReady();
+}
+
+/**
+ * clearManualFixtures()
+ * Empties the entire manualFixtures array.
+ */
+function clearManualFixtures() {
+  manualFixtures = [];
+  renderManualFixtureList();
+  injectManualFixtures();
+  checkReady();
+}
+
+/**
+ * renderManualFixtureList()
+ * Re-renders the visible fixture list from manualFixtures[].
+ */
+function renderManualFixtureList() {
+  const listEl  = document.getElementById('mfiList');
+  const itemsEl = document.getElementById('mfiItems');
+  const countEl = document.getElementById('mfiCount');
+
+  if (!manualFixtures.length) {
+    listEl.style.display = 'none';
+    return;
+  }
+
+  listEl.style.display = 'block';
+  countEl.textContent  = `${manualFixtures.length} manual fixture(s)`;
+
+  itemsEl.innerHTML = manualFixtures.map((f, i) => {
+    // Format date for display (DD Mon YYYY) or blank if not set
+    const dateLabel = f.date
+      ? new Date(f.date + 'T00:00:00').toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' })
+      : '—';
+    return `
+      <div class="mfi-item">
+        <span class="mfi-item-fix">${escHtml(f.home)} vs ${escHtml(f.away)}</span>
+        <span class="mfi-item-date">${dateLabel}</span>
+        <button class="mfi-item-del" onclick="removeManualFixture(${i})" title="Remove">✕</button>
+      </div>`;
+  }).join('');
+}
+
+/**
+ * injectManualFixtures()
+ * Converts manualFixtures[] into a fixSheets-compatible row array and
+ * stores it under fixSheets['__manual__'].
+ *
+ * Each row uses the standard column names the pipeline expects:
+ *   HomeTeam, AwayTeam, Date  (compatible with getCols() detection)
+ *
+ * If no manual fixtures exist the __manual__ sheet is removed so it
+ * doesn't interfere with Drive-sourced fixtures.
+ *
+ * Integration with prediction logic:
+ *   fixSheets['__manual__'] rows flow into calcFixture() exactly like
+ *   any other fixture sheet. The mergedDataset is available globally
+ *   to read historical stats keyed by team name.
+ */
+function injectManualFixtures() {
+  if (!manualFixtures.length) {
+    // Remove the manual sheet if it was previously set
+    delete fixSheets['__manual__'];
+    return;
+  }
+
+  // Build rows in the shape the pipeline recognises
+  const rows = manualFixtures.map(f => ({
+    HomeTeam: f.home,
+    AwayTeam: f.away,
+    Date:     f.date || '',   // optional; empty string if user skipped it
+  }));
+
+  fixSheets['__manual__'] = rows;
+}
+
+/** Utility: HTML-escape a string to safely insert into innerHTML */
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/** Show a brief status message in the manual fixture feedback area */
+function showMfiMsg(text, type) {
+  const el = document.getElementById('mfiMsg');
+  if (!el) return;
+  el.textContent = text;
+  el.className   = 'mfi-msg ' + (type || '');
+  // Auto-clear success messages after 3 s
+  if (type === 'ok') {
+    clearTimeout(el._mfiTimer);
+    el._mfiTimer = setTimeout(() => { el.textContent = ''; el.className = 'mfi-msg'; }, 3000);
+  }
+}
+
+/** Allow pressing Enter in the Away field to submit the fixture */
+document.addEventListener('DOMContentLoaded', () => {
+  ['mfiHome', 'mfiAway', 'mfiDate'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('keydown', e => { if (e.key === 'Enter') addManualFixture(); });
+  });
+});
+
+// ── Override checkReady to also count manual fixtures ────────────────────────
+// The original checkReady only enables Run if histSheets + fixSheets exist.
+// We extend it so manual fixtures alone are enough to enable the button.
+const _origCheckReady = checkReady;
+function checkReady() {
+  const hasHist  = Object.keys(histSheets).length > 0;
+  const hasFix   = fixSheets && Object.keys(fixSheets).length > 0;
+  const hasManual = manualFixtures.length > 0;
+  // Sync manual fixtures into fixSheets before the check
+  if (hasManual) injectManualFixtures();
+  document.getElementById('runBtn').disabled = !(hasHist && (hasFix || hasManual));
+}
 </script>
 </body>
 </html>
