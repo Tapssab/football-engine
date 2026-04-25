@@ -575,97 +575,38 @@ img,video,svg{max-width:100%;height:auto}
 .lo-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--accent),#00b8ff);border-radius:3px;transition:width .35s cubic-bezier(.4,0,.2,1);}
 .lo-count{font-family:var(--mono);font-size:.58rem;color:var(--t3);letter-spacing:.5px;}
 /* ═══════════════════════════════════════════
-   MANUAL FIXTURE INPUT
+   FIXTURE FILE UPLOAD
    ═══════════════════════════════════════════ */
-.mfi-form{display:flex;flex-direction:column;gap:6px;margin-top:6px}
-.mfi-input{
-  background:var(--sb2,#1a1a2e);
-  border:1px solid var(--gb,rgba(255,255,255,.08));
-  border-radius:6px;
-  color:var(--t1,#e8e8f0);
-  font-size:.72rem;
-  padding:7px 10px;
-  outline:none;
-  transition:border-color .15s;
-  width:100%;
-  box-sizing:border-box;
-}
-.mfi-input:focus{border-color:var(--accent,#00e5a0);}
-.mfi-input::placeholder{color:var(--t3,#5a5a78);}
-.mfi-input.mfi-date{color-scheme:dark;cursor:pointer;}
-.mfi-add-btn{
-  background:var(--accent,#00e5a0);
-  border:none;
-  border-radius:6px;
-  color:#0a0a14;
-  cursor:pointer;
-  font-size:.72rem;
-  font-weight:700;
-  padding:8px 0;
-  text-align:center;
-  transition:opacity .15s, transform .1s;
-  width:100%;
-}
-.mfi-add-btn:hover{opacity:.85;}
-.mfi-add-btn:active{transform:scale(.97);}
-/* Feedback message under the form */
-.mfi-msg{
-  font-family:var(--mono,monospace);
+/* Status line under the upload button */
+.fix-upload-status{
+  font-family:var(--mono);
   font-size:.6rem;
-  margin-top:2px;
+  margin-top:5px;
   min-height:14px;
-  transition:color .2s;
+  line-height:1.5;
 }
-.mfi-msg.ok {color:var(--accent,#00e5a0);}
-.mfi-msg.err{color:var(--a2,#ff4d6d);}
-/* Fixture list */
-.mfi-list{margin-top:8px;}
-.mfi-list-hd{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  font-family:var(--mono,monospace);
-  font-size:.58rem;
-  color:var(--t3,#5a5a78);
-  border-bottom:1px solid var(--gb,rgba(255,255,255,.06));
-  padding-bottom:5px;
-  margin-bottom:5px;
+.fix-upload-status.ok     { color:var(--accent,#00e5a0); }
+.fix-upload-status.err    { color:var(--a2,#ff4d6d); }
+.fix-upload-status.loading{ color:var(--t3,#5a5a78); }
+/* Tint the upload label after a file is loaded */
+.fix-label-loaded{
+  border-color:var(--accent,#00e5a0) !important;
+  color:var(--accent,#00e5a0) !important;
 }
-.mfi-clear-btn{
+/* Remove-file button */
+.fix-remove-btn{
+  margin-top:5px;
   background:none;
-  border:1px solid var(--gb,rgba(255,255,255,.1));
-  border-radius:4px;
-  color:var(--a2,#ff4d6d);
-  cursor:pointer;
-  font-size:.55rem;
-  padding:2px 6px;
-}
-.mfi-clear-btn:hover{background:rgba(255,77,109,.1);}
-/* Individual fixture row */
-.mfi-item{
-  display:flex;
-  align-items:center;
-  gap:6px;
-  padding:5px 7px;
-  background:rgba(0,229,160,.04);
-  border:1px solid rgba(0,229,160,.1);
+  border:1px solid rgba(255,77,109,.35);
   border-radius:5px;
-  margin-bottom:4px;
-  font-size:.65rem;
-}
-.mfi-item-fix{flex:1;color:var(--t1,#e8e8f0);font-weight:600;}
-.mfi-item-date{font-family:var(--mono,monospace);color:var(--t3,#5a5a78);font-size:.58rem;}
-.mfi-item-del{
-  background:none;
-  border:none;
   color:var(--a2,#ff4d6d);
   cursor:pointer;
-  font-size:.7rem;
-  line-height:1;
-  padding:2px 4px;
-  border-radius:3px;
+  font-size:.6rem;
+  padding:4px 8px;
+  width:100%;
+  transition:background .15s;
 }
-.mfi-item-del:hover{background:rgba(255,77,109,.15);}
+.fix-remove-btn:hover{ background:rgba(255,77,109,.1); }
 </style>
 </head>
 <body>
@@ -804,48 +745,32 @@ img,video,svg{max-width:100%;height:auto}
     </div>
 
     <div>
-      <div class="sb-hd">Manual Fixture Input</div>
+      <div class="sb-hd">Upload Fixture File</div>
 
-      <!-- Input form: Home, Away, Date, Add button -->
-      <div class="mfi-form">
-        <input
-          type="text"
-          id="mfiHome"
-          class="mfi-input"
-          placeholder="Home Team"
-          autocomplete="off"
-          spellcheck="false"
-        >
-        <input
-          type="text"
-          id="mfiAway"
-          class="mfi-input"
-          placeholder="Away Team"
-          autocomplete="off"
-          spellcheck="false"
-        >
-        <input
-          type="date"
-          id="mfiDate"
-          class="mfi-input mfi-date"
-          title="Match date"
-        >
-        <button class="mfi-add-btn" id="mfiAddBtn" onclick="addManualFixture()">
-          ＋ Add Fixture
-        </button>
+      <!-- Hidden file input — triggered by the styled label below -->
+      <input type="file" id="fileFixtures" accept=".xlsx,.xls" style="display:none">
+
+      <!-- Styled upload button (same visual language as "Add Results File") -->
+      <label for="fileFixtures" class="add-file-btn" id="fixUploadLabel" style="margin-top:4px;cursor:pointer">
+        <span class="add-file-plus">📅</span>
+        <span>Upload Fixtures (.xlsx)</span>
+      </label>
+
+      <!-- Status line shown after a file is loaded -->
+      <div class="fix-upload-status" id="fixUploadStatus"></div>
+
+      <!-- Format hint -->
+      <div style="font-family:var(--mono);font-size:.52rem;color:var(--t3);margin-top:6px;line-height:1.6">
+        Excel column names accepted:<br>
+        <b style="color:var(--t1)">HomeTeam</b> / <b style="color:var(--t1)">Home</b> / <b style="color:var(--t1)">home_team</b><br>
+        <b style="color:var(--t1)">AwayTeam</b> / <b style="color:var(--t1)">Away</b> / <b style="color:var(--t1)">away_team</b><br>
+        Optional: <b style="color:var(--t1)">Date</b>, <b style="color:var(--t1)">League</b>, <b style="color:var(--t1)">Round</b>
       </div>
 
-      <!-- Inline validation / feedback message -->
-      <div class="mfi-msg" id="mfiMsg"></div>
-
-      <!-- List of added fixtures (hidden until at least one is added) -->
-      <div id="mfiList" class="mfi-list" style="display:none">
-        <div class="mfi-list-hd">
-          <span id="mfiCount">0 manual fixture(s)</span>
-          <button class="mfi-clear-btn" onclick="clearManualFixtures()">Clear all</button>
-        </div>
-        <div id="mfiItems"></div>
-      </div>
+      <!-- Remove button — hidden until a file is loaded -->
+      <button class="fix-remove-btn" id="fixRemoveBtn" onclick="removeFixtureFile()" style="display:none">
+        ✕ Remove fixture file
+      </button>
     </div>
 
     <div>
@@ -4188,208 +4113,209 @@ document.getElementById('gamesBtn').addEventListener('click',()=>{
 })();
 
 // ═══════════════════════════════════════════════════════════════════
+// FIXTURE FILE UPLOAD
 // ───────────────────────────────────────────────────────────────────
-// manualFixtures[] is the source of truth for user-entered fixtures.
-// Each entry shape: { home, away, date }
+// Lets the user upload a local .xlsx / .xls file containing upcoming
+// fixtures. The file must have at least two columns for home and away
+// team names. Column names are detected flexibly — the same aliases
+// the existing Drive pipeline already understands plus a few extras:
 //
-// When Run Analysis fires, injectManualFixtures() converts the array
-// into a fixSheets-compatible sheet so calcFixture() can process them
-// alongside any Drive fixtures that were loaded.
+//   Home column: HomeTeam | Home | home_team | home | HT
+//   Away column: AwayTeam | Away | away_team | away | AT
+//   Optional  : Date | date | League | league | Round | round
 //
-// Integration point with prediction logic:
-//   • fixSheets['__manual__'] = rows from manualFixtures
-//   • mergedDataset is available globally for any extra analysis
+// On load the sheets are written directly into fixSheets (keyed as
+// "filename::sheetName") so the Run Analysis pipeline sees them
+// exactly like a Drive-loaded fixture file — no extra wiring needed.
 // ═══════════════════════════════════════════════════════════════════
 
-/** In-memory store for manually entered fixtures */
-let manualFixtures = [];
+/** Track the name of the currently loaded fixture file (for UI only) */
+let uploadedFixtureFileName = null;
 
 /**
- * addManualFixture()
- * Reads the three input fields, validates them, pushes to manualFixtures[],
- * updates the UI list, clears fields, and calls checkReady().
+ * Flexible home/away column aliases accepted in the uploaded file.
+ * Detection is case-insensitive; first match wins.
  */
-function addManualFixture() {
-  const homeEl = document.getElementById('mfiHome');
-  const awayEl = document.getElementById('mfiAway');
-  const dateEl = document.getElementById('mfiDate');
-  const msgEl  = document.getElementById('mfiMsg');
+const FIX_HOME_ALIASES = ['hometeam', 'home', 'home_team', 'ht', 'homeside'];
+const FIX_AWAY_ALIASES = ['awayteam', 'away', 'away_team', 'at', 'awayside'];
 
-  const home = homeEl.value.trim();
-  const away = awayEl.value.trim();
-  const date = dateEl.value; // YYYY-MM-DD from <input type="date">
-
-  // ── Validation ──
-  if (!home) {
-    showMfiMsg('Please enter a Home Team name.', 'err');
-    homeEl.focus();
-    return;
+/**
+ * findFixCol(headers, aliases)
+ * Returns the first header string (original casing) whose lower-case
+ * version matches one of the supplied aliases. Returns null if none match.
+ */
+function findFixCol(headers, aliases) {
+  for (const alias of aliases) {
+    const match = headers.find(h => h.toLowerCase().trim() === alias);
+    if (match !== undefined) return match;
   }
-  if (!away) {
-    showMfiMsg('Please enter an Away Team name.', 'err');
-    awayEl.focus();
-    return;
-  }
-  if (home.toLowerCase() === away.toLowerCase()) {
-    showMfiMsg('Home and Away teams must be different.', 'err');
-    awayEl.focus();
-    return;
-  }
-
-  // Check for duplicate fixture
-  const isDupe = manualFixtures.some(
-    f => f.home.toLowerCase() === home.toLowerCase() &&
-         f.away.toLowerCase() === away.toLowerCase()
-  );
-  if (isDupe) {
-    showMfiMsg(`"${home} vs ${away}" is already in the list.`, 'err');
-    return;
-  }
-
-  // Push to array
-  const fixture = { home, away, date };
-  manualFixtures.push(fixture);
-
-  // Clear inputs (keep date so back-to-back entries on same day are quick)
-  homeEl.value = '';
-  awayEl.value = '';
-  homeEl.focus();
-
-  // Refresh UI
-  renderManualFixtureList();
-  injectManualFixtures(); // sync into fixSheets immediately
-  showMfiMsg(`✓ Added: ${home} vs ${away}`, 'ok');
-  checkReady();
+  return null;
 }
 
 /**
- * removeManualFixture(index)
- * Removes the fixture at [index] from manualFixtures[] and refreshes UI.
+ * validateFixtureSheet(rows, sheetName)
+ * Checks that a sheet has recognisable home and away columns.
+ * Returns { ok, homeCol, awayCol, error }.
  */
-function removeManualFixture(index) {
-  manualFixtures.splice(index, 1);
-  renderManualFixtureList();
-  injectManualFixtures();
-  checkReady();
+function validateFixtureSheet(rows, sheetName) {
+  if (!rows || rows.length === 0) {
+    return { ok: false, error: `Sheet "${sheetName}" is empty.` };
+  }
+  const headers = Object.keys(rows[0]);
+  const homeCol = findFixCol(headers, FIX_HOME_ALIASES);
+  const awayCol = findFixCol(headers, FIX_AWAY_ALIASES);
+  if (!homeCol) {
+    return { ok: false, error: `Sheet "${sheetName}": no Home column found. Expected one of: HomeTeam, Home, home_team.` };
+  }
+  if (!awayCol) {
+    return { ok: false, error: `Sheet "${sheetName}": no Away column found. Expected one of: AwayTeam, Away, away_team.` };
+  }
+  return { ok: true, homeCol, awayCol };
 }
 
 /**
- * clearManualFixtures()
- * Empties the entire manualFixtures array.
+ * normaliseFixtureRows(rows, homeCol, awayCol)
+ * Remaps rows so that HomeTeam / AwayTeam are always present with those
+ * exact names, regardless of what alias the user's file used.
+ * All other columns (Date, League, Round …) are kept unchanged.
  */
-function clearManualFixtures() {
-  manualFixtures = [];
-  renderManualFixtureList();
-  injectManualFixtures();
-  checkReady();
-}
-
-/**
- * renderManualFixtureList()
- * Re-renders the visible fixture list from manualFixtures[].
- */
-function renderManualFixtureList() {
-  const listEl  = document.getElementById('mfiList');
-  const itemsEl = document.getElementById('mfiItems');
-  const countEl = document.getElementById('mfiCount');
-
-  if (!manualFixtures.length) {
-    listEl.style.display = 'none';
-    return;
-  }
-
-  listEl.style.display = 'block';
-  countEl.textContent  = `${manualFixtures.length} manual fixture(s)`;
-
-  itemsEl.innerHTML = manualFixtures.map((f, i) => {
-    // Format date for display (DD Mon YYYY) or blank if not set
-    const dateLabel = f.date
-      ? new Date(f.date + 'T00:00:00').toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' })
-      : '—';
-    return `
-      <div class="mfi-item">
-        <span class="mfi-item-fix">${escHtml(f.home)} vs ${escHtml(f.away)}</span>
-        <span class="mfi-item-date">${dateLabel}</span>
-        <button class="mfi-item-del" onclick="removeManualFixture(${i})" title="Remove">✕</button>
-      </div>`;
-  }).join('');
-}
-
-/**
- * injectManualFixtures()
- * Converts manualFixtures[] into a fixSheets-compatible row array and
- * stores it under fixSheets['__manual__'].
- *
- * Each row uses the standard column names the pipeline expects:
- *   HomeTeam, AwayTeam, Date  (compatible with getCols() detection)
- *
- * If no manual fixtures exist the __manual__ sheet is removed so it
- * doesn't interfere with Drive-sourced fixtures.
- *
- * Integration with prediction logic:
- *   fixSheets['__manual__'] rows flow into calcFixture() exactly like
- *   any other fixture sheet. The mergedDataset is available globally
- *   to read historical stats keyed by team name.
- */
-function injectManualFixtures() {
-  if (!manualFixtures.length) {
-    // Remove the manual sheet if it was previously set
-    delete fixSheets['__manual__'];
-    return;
-  }
-
-  // Build rows in the shape the pipeline recognises
-  const rows = manualFixtures.map(f => ({
-    HomeTeam: f.home,
-    AwayTeam: f.away,
-    Date:     f.date || '',   // optional; empty string if user skipped it
-  }));
-
-  fixSheets['__manual__'] = rows;
-}
-
-/** Utility: HTML-escape a string to safely insert into innerHTML */
-function escHtml(str) {
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
-/** Show a brief status message in the manual fixture feedback area */
-function showMfiMsg(text, type) {
-  const el = document.getElementById('mfiMsg');
-  if (!el) return;
-  el.textContent = text;
-  el.className   = 'mfi-msg ' + (type || '');
-  // Auto-clear success messages after 3 s
-  if (type === 'ok') {
-    clearTimeout(el._mfiTimer);
-    el._mfiTimer = setTimeout(() => { el.textContent = ''; el.className = 'mfi-msg'; }, 3000);
-  }
-}
-
-/** Allow pressing Enter in the Away field to submit the fixture */
-document.addEventListener('DOMContentLoaded', () => {
-  ['mfiHome', 'mfiAway', 'mfiDate'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.addEventListener('keydown', e => { if (e.key === 'Enter') addManualFixture(); });
+function normaliseFixtureRows(rows, homeCol, awayCol) {
+  return rows.map(row => {
+    const out = Object.assign({}, row);
+    // Remap to canonical names expected by getCols() in the pipeline
+    if (homeCol !== 'HomeTeam') { out['HomeTeam'] = row[homeCol]; delete out[homeCol]; }
+    if (awayCol !== 'AwayTeam') { out['AwayTeam'] = row[awayCol]; delete out[awayCol]; }
+    return out;
+  }).filter(row => {
+    // Drop rows where both team names are blank / undefined
+    const h = String(row['HomeTeam'] || '').trim();
+    const a = String(row['AwayTeam'] || '').trim();
+    return h && a;
   });
-});
-
-// ── Override checkReady to also count manual fixtures ────────────────────────
-// The original checkReady only enables Run if histSheets + fixSheets exist.
-// We extend it so manual fixtures alone are enough to enable the button.
-const _origCheckReady = checkReady;
-function checkReady() {
-  const hasHist  = Object.keys(histSheets).length > 0;
-  const hasFix   = fixSheets && Object.keys(fixSheets).length > 0;
-  const hasManual = manualFixtures.length > 0;
-  // Sync manual fixtures into fixSheets before the check
-  if (hasManual) injectManualFixtures();
-  document.getElementById('runBtn').disabled = !(hasHist && (hasFix || hasManual));
 }
+
+/**
+ * removeFixtureFile()
+ * Clears all fixture sheets that came from the uploaded file and
+ * resets the UI back to the empty state.
+ */
+function removeFixtureFile() {
+  if (!uploadedFixtureFileName) return;
+
+  // Remove every sheet keyed under this filename
+  Object.keys(fixSheets || {})
+    .filter(k => k.startsWith(uploadedFixtureFileName + '::'))
+    .forEach(k => delete fixSheets[k]);
+
+  uploadedFixtureFileName = null;
+
+  // Reset UI
+  const statusEl = document.getElementById('fixUploadStatus');
+  const removeBtn = document.getElementById('fixRemoveBtn');
+  const labelEl   = document.getElementById('fixUploadLabel');
+  if (statusEl)  { statusEl.textContent = ''; statusEl.className = 'fix-upload-status'; }
+  if (removeBtn) removeBtn.style.display = 'none';
+  if (labelEl)   labelEl.classList.remove('fix-label-loaded');
+
+  // Reset the file input so the same file can be re-uploaded if needed
+  const input = document.getElementById('fileFixtures');
+  if (input) input.value = '';
+
+  log('Fixture file removed.', 'ok');
+  checkReady();
+}
+
+/** Wire up the file input once the DOM is ready */
+document.getElementById('fileFixtures').addEventListener('change', async function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const statusEl  = document.getElementById('fixUploadStatus');
+  const removeBtn = document.getElementById('fixRemoveBtn');
+  const labelEl   = document.getElementById('fixUploadLabel');
+
+  // Show loading state
+  statusEl.textContent  = 'Reading file…';
+  statusEl.className    = 'fix-upload-status loading';
+
+  try {
+    // Reuse the existing parseFile() helper — same XLSX parsing as history files
+    const sheets = await parseFile(file);
+    const sheetNames = Object.keys(sheets);
+
+    if (!sheetNames.length) {
+      throw new Error('The file contains no sheets.');
+    }
+
+    // Remove any previously uploaded fixture file from fixSheets
+    if (uploadedFixtureFileName) {
+      Object.keys(fixSheets || {})
+        .filter(k => k.startsWith(uploadedFixtureFileName + '::'))
+        .forEach(k => delete fixSheets[k]);
+    }
+
+    // Ensure fixSheets is initialised
+    if (!fixSheets) fixSheets = {};
+
+    let totalFixtures = 0;
+    let sheetsLoaded  = 0;
+    const warnings    = [];
+
+    for (const sheetName of sheetNames) {
+      const rows = sheets[sheetName];
+      const { ok, homeCol, awayCol, error } = validateFixtureSheet(rows, sheetName);
+
+      if (!ok) {
+        // Sheet doesn't have the right columns — warn and skip
+        warnings.push(error);
+        log(`⚠ Skipped sheet "${sheetName}": ${error}`, 'err');
+        continue;
+      }
+
+      // Normalise column names to what the pipeline expects
+      const normalised = normaliseFixtureRows(rows, homeCol, awayCol);
+      if (!normalised.length) {
+        warnings.push(`Sheet "${sheetName}" had no valid fixture rows.`);
+        continue;
+      }
+
+      // Store under the standard "filename::sheetName" key
+      fixSheets[`${file.name}::${sheetName}`] = normalised;
+      totalFixtures += normalised.length;
+      sheetsLoaded++;
+      log(`✓ Fixtures sheet "${sheetName}": ${normalised.length} fixture(s) (home col: "${homeCol}", away col: "${awayCol}")`, 'ok');
+    }
+
+    if (!sheetsLoaded) {
+      throw new Error(
+        'No valid fixture sheets found. ' +
+        (warnings.length ? warnings[0] : 'Check column names: HomeTeam / Home / home_team and AwayTeam / Away / away_team.')
+      );
+    }
+
+    uploadedFixtureFileName = file.name;
+
+    // Update UI
+    statusEl.textContent = `✓ ${totalFixtures} fixture${totalFixtures !== 1 ? 's' : ''} from ${sheetsLoaded} sheet${sheetsLoaded !== 1 ? 's' : ''}`;
+    statusEl.className   = 'fix-upload-status ok';
+    removeBtn.style.display = 'block';
+    labelEl.classList.add('fix-label-loaded');
+
+    if (warnings.length) {
+      log(`⚠ ${warnings.length} sheet(s) skipped — ${warnings.join(' | ')}`, 'err');
+    }
+
+    log(`✓ Fixture file loaded: "${file.name}" — ${totalFixtures} upcoming fixture(s)`, 'ok');
+    checkReady();
+
+  } catch (err) {
+    statusEl.textContent = `✗ ${err.message}`;
+    statusEl.className   = 'fix-upload-status err';
+    log(`✗ Fixture file error: ${err.message}`, 'err');
+    // Reset input so user can try again
+    e.target.value = '';
+  }
+});
 </script>
 </body>
 </html>
