@@ -472,9 +472,10 @@ img,video,svg{max-width:100%;height:auto}
    ═══════════════════════════════════════════════════ */
 #landingPage {
   display:flex; flex-direction:column; align-items:center; justify-content:center;
-  min-height:100vh; padding:40px 20px;
+  height:100vh; padding:40px 20px;
   background:var(--bg);
   position:relative; z-index:1;
+  overflow-y:auto;
 }
 .land-logo {
   font-size:2.8rem; margin-bottom:8px; filter:drop-shadow(0 0 24px rgba(0,229,160,.4));
@@ -528,8 +529,8 @@ img,video,svg{max-width:100%;height:auto}
 }
 
 /* App shell — hidden until a sport is selected */
-#appShell { display:none; flex-direction:column; height:100vh; }
-#appShell.active { display:flex; }
+#appShell { display:none; height:100vh; }
+#appShell.active { display:flex; flex-direction:column; }
 
 /* Back button in topbar */
 .back-btn {
@@ -574,39 +575,6 @@ img,video,svg{max-width:100%;height:auto}
 .lo-track{width:320px;max-width:80vw;height:6px;background:var(--glass);border-radius:3px;overflow:hidden;}
 .lo-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--accent),#00b8ff);border-radius:3px;transition:width .35s cubic-bezier(.4,0,.2,1);}
 .lo-count{font-family:var(--mono);font-size:.58rem;color:var(--t3);letter-spacing:.5px;}
-/* ═══════════════════════════════════════════
-   FIXTURE FILE UPLOAD
-   ═══════════════════════════════════════════ */
-/* Status line under the upload button */
-.fix-upload-status{
-  font-family:var(--mono);
-  font-size:.6rem;
-  margin-top:5px;
-  min-height:14px;
-  line-height:1.5;
-}
-.fix-upload-status.ok     { color:var(--accent,#00e5a0); }
-.fix-upload-status.err    { color:var(--a2,#ff4d6d); }
-.fix-upload-status.loading{ color:var(--t3,#5a5a78); }
-/* Tint the upload label after a file is loaded */
-.fix-label-loaded{
-  border-color:var(--accent,#00e5a0) !important;
-  color:var(--accent,#00e5a0) !important;
-}
-/* Remove-file button */
-.fix-remove-btn{
-  margin-top:5px;
-  background:none;
-  border:1px solid rgba(255,77,109,.35);
-  border-radius:5px;
-  color:var(--a2,#ff4d6d);
-  cursor:pointer;
-  font-size:.6rem;
-  padding:4px 8px;
-  width:100%;
-  transition:background .15s;
-}
-.fix-remove-btn:hover{ background:rgba(255,77,109,.1); }
 </style>
 </head>
 <body>
@@ -742,35 +710,20 @@ img,video,svg{max-width:100%;height:auto}
         Refresh Fixtures from Drive
       </button>
       <div class="drive-status" id="driveFixStatus"></div>
-    </div>
 
-    <div>
-      <div class="sb-hd">Upload Fixture File</div>
-
-      <!-- Hidden file input — triggered by the styled label below -->
-      <input type="file" id="fileFixtures" accept=".xlsx,.xls" style="display:none">
-
-      <!-- Styled upload button (same visual language as "Add Results File") -->
-      <label for="fileFixtures" class="add-file-btn" id="fixUploadLabel" style="margin-top:4px;cursor:pointer">
-        <span class="add-file-plus">📅</span>
-        <span>Upload Fixtures (.xlsx)</span>
-      </label>
-
-      <!-- Status line shown after a file is loaded -->
-      <div class="fix-upload-status" id="fixUploadStatus"></div>
-
-      <!-- Format hint -->
-      <div style="font-family:var(--mono);font-size:.52rem;color:var(--t3);margin-top:6px;line-height:1.6">
-        Excel column names accepted:<br>
-        <b style="color:var(--t1)">HomeTeam</b> / <b style="color:var(--t1)">Home</b> / <b style="color:var(--t1)">home_team</b><br>
-        <b style="color:var(--t1)">AwayTeam</b> / <b style="color:var(--t1)">Away</b> / <b style="color:var(--t1)">away_team</b><br>
-        Optional: <b style="color:var(--t1)">Date</b>, <b style="color:var(--t1)">League</b>, <b style="color:var(--t1)">Round</b>
+      <!-- Manual fixture upload: CSV or XLSX alternative to Google Drive -->
+      <div style="margin-top:10px;">
+        <div class="sb-hd" style="font-size:0.78rem;margin-bottom:4px;">Or upload fixtures manually</div>
+        <label id="fixUploadLabel" style="display:flex;align-items:center;gap:7px;cursor:pointer;
+               background:var(--bg2,#151b22);border:1px dashed var(--border,#2a3344);
+               border-radius:7px;padding:8px 12px;font-size:0.82rem;color:var(--t2,#8899aa);">
+          <span style="font-size:1.1rem;">📂</span>
+          <span id="fixUploadName">Choose CSV / XLSX file…</span>
+          <input type="file" id="fixFileInput" accept=".csv,.xlsx,.xls"
+                 style="display:none" onchange="handleFixtureFileUpload(this)">
+        </label>
+        <div class="drive-status" id="manualFixStatus"></div>
       </div>
-
-      <!-- Remove button — hidden until a file is loaded -->
-      <button class="fix-remove-btn" id="fixRemoveBtn" onclick="removeFixtureFile()" style="display:none">
-        ✕ Remove fixture file
-      </button>
     </div>
 
     <div>
@@ -998,52 +951,24 @@ img,video,svg{max-width:100%;height:auto}
 </div><!-- /appShell -->
 
 <script>
-// ═══════════════════════════════════════════════
-// GOOGLE DRIVE LOADER  (v2 — historical + fixtures)
-// ═══════════════════════════════════════════════
+// ===============================================
+// GOOGLE DRIVE LOADER  (v2   historical + fixtures)
+// ===============================================
 const DRIVE_FOLDER_ID = '1FSKEeRH22QXiPPNZ6FmTtC1yuQqKkCtK';
 
-// ─────────────────────────────────────────────────────────────────────
-// HISTORICAL DATA FILES
-//
-// 16 files across four tiers. Edit names here if files are renamed.
-// loadFromDrive() fetches all of them in parallel from DRIVE_FOLDER_ID.
-//
-// Tier 1 — Heavy Elite (4 files)   England top/mid/low + Brazil/Argentina
-// Tier 2 — Medium Elite (6 files)  Western, Central, Southern, Northern,
-//                                  Misc and Alpine European leagues
-// Tier 3 — Global Elite (2 files)  Americas (MLS/Mexico/Chile) + Asia/ME
-// Tier 4 — Normals / FT (4 files)  Lower-tier Europe, Americas, Global,
-//                                  and Youth/U21 leagues
-// ─────────────────────────────────────────────────────────────────────
+// Historical results files   loaded into histSheets
+// These are the exact file names expected in the Google Drive folder.
 const DRIVE_HIST_FILES = [
-  // ── Tier 1: Heavy Elite ──────────────────────────────────────────
-  'Elite_Eng_Top.xlsx',   // Premier League & Championship
-  'Elite_Eng_Mid.xlsx',   // League 1 & League 2
-  'Elite_Eng_Low.xlsx',   // National League & North/South
-  'Elite_Bra_Arg.xlsx',   // Brazil Serie A & Argentina Liga Profesional
-
-  // ── Tier 2: Medium Elite ─────────────────────────────────────────
-  'Elite_EU_West.xlsx',   // Spain (La Liga 1 & 2) and France (Ligue 1)
-  'Elite_EU_Cent.xlsx',   // France (Ligue 2) and Germany (Bundesliga 1 & 2)
-  'Elite_EU_South.xlsx',  // Italy (Serie A & B) and Portugal
-  'Elite_EU_North.xlsx',  // Netherlands (Eredivisie 1 & 2) and Belgium
-  'Elite_EU_Misc.xlsx',   // Scotland (1 & 2) and Turkey
-  'Elite_EU_Alps.xlsx',   // Greece, Austria, and Switzerland
-
-  // ── Tier 3: Global Elite ─────────────────────────────────────────
-  'Elite_Americas.xlsx',  // USA (MLS), Mexico, and Chile
-  'Elite_Asia_ME.xlsx',   // Japan, South Korea, and Saudi Arabia
-
-  // ── Tier 4: Normals (FT) ─────────────────────────────────────────
-  'Normal_Europe.xlsx',   // 7 lower-tier European leagues
-  'Normal_Americas.xlsx', // 6 secondary Americas leagues
-  'Normal_Global.xlsx',   // 8 leagues (Africa, SE Asia, Middle East)
-  'Normal_Youth.xlsx',    // 4 Youth/U21 leagues
+  'Elite Europe',
+  'Americas_Normal',
+  'Asia_ME_Normal',
+  'Africa_Normal',
+  'International',
+  'Daily_Results',
 ];
 
-// Fixtures file — loaded into fixSheets (replaces manual upload)
-const DRIVE_FIX_FILE = 'Upcoming_Fixtures.xlsx';
+// Fixtures file   loaded into fixSheets (Google Drive source)
+const DRIVE_FIX_FILE = 'Daily_Fixtures';
 
 let driveAccessToken = null;
 
@@ -1060,7 +985,7 @@ function driveFixStatus(msg, type) {
   el.className = 'drive-status ' + type;
 }
 
-// ── Helper: search + download one file from Drive ──────────────────
+// -- Helper: search + download one file from Drive ------------------
 async function driveDownloadFile(filename, token) {
   const searchUrl = `https://www.googleapis.com/drive/v3/files?q=name='${filename}'+and+'${DRIVE_FOLDER_ID}'+in+parents+and+trashed=false&fields=files(id,name,modifiedTime)`;
   const searchRes = await fetch(searchUrl, { headers: { Authorization: 'Bearer ' + token } });
@@ -1086,120 +1011,57 @@ async function driveDownloadFile(filename, token) {
   return { sheets, modified };
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// MERGED DATASET
-// All data from all 16 loaded files is combined into this single structure
-// after every Drive load. Shape: { byTeam: {teamKey → [matches]},
-//                                   flat:   [all rows across all sheets],
-//                                   meta:   {filename → {sheets, modified}} }
-// Prediction logic can read mergedDataset.byTeam or mergedDataset.flat.
-// ─────────────────────────────────────────────────────────────────────────
-let mergedDataset = { byTeam: {}, flat: [], meta: {} };
-
-/**
- * buildMergedDataset()
- * Rebuilds mergedDataset from histSheets + matchStore after every load.
- * Called automatically by rebuildIndex().
- */
-function buildMergedDataset() {
-  // flat: every raw row from every sheet (for generic analysis)
-  const flat = [];
-  for (const [key, rows] of Object.entries(histSheets)) {
-    for (const row of rows) {
-      flat.push({ _source: key, ...row });
-    }
-  }
-
-  // byTeam: mirrors matchStore but exposed on mergedDataset for external use
-  const byTeam = {};
-  for (const [teamKey, matches] of Object.entries(matchStore)) {
-    byTeam[teamKey] = [...matches]; // shallow copy; safe to iterate
-  }
-
-  mergedDataset.flat   = flat;
-  mergedDataset.byTeam = byTeam;
-  // meta is populated incrementally during loading (see loadFromDrive)
-}
-
-// ── Main Drive load — historical results (parallel fetch for all 16 files) ──
+// -- Main Drive load   historical results ---------------------------
 async function loadFromDrive() {
   const btn = document.getElementById('driveBtn');
   btn.disabled = true;
-  driveStatus('Signing in to Google…', 'loading');
+  driveStatus('Signing in to Google ', 'loading');
 
   try {
     if (!window.google || !window.google.accounts) {
       await loadScript('https://accounts.google.com/gsi/client');
     }
     driveAccessToken = await getGoogleAccessToken();
-    driveStatus(`Connected — fetching ${DRIVE_HIST_FILES.length} files in parallel…`, 'loading');
-    log(`Drive: queuing ${DRIVE_HIST_FILES.length} file fetch(es) asynchronously…`);
+    driveStatus('Connected   fetching historical files ', 'loading');
 
-    // ── Fetch all files concurrently with individual error handling ──
-    // Promise.allSettled ensures one failure never blocks the others.
-    const fetchTasks = DRIVE_HIST_FILES.map(filename =>
-      driveDownloadFile(filename, driveAccessToken)
-        .then(result => ({ filename, result, ok: true }))
-        .catch(err   => ({ filename, result: null, ok: false, err }))
-    );
-
-    const outcomes = await Promise.allSettled(fetchTasks);
     let loaded = 0;
     const errors = [];
 
-    for (const outcome of outcomes) {
-      // Promise.allSettled wraps our already-caught promises; value is always present
-      const { filename, result, ok, err } = outcome.value || {};
-
-      if (!ok) {
+    for (const filename of DRIVE_HIST_FILES) {
+      try {
+        log(`Drive: fetching ${filename} `);
+        const result = await driveDownloadFile(filename, driveAccessToken);
+        if (!result) {
+          log(`Drive: ${filename} not found in folder   skipping`, 'err');
+          continue;
+        }
+        // Replace if already loaded
+        if (loadedFiles.includes(filename)) {
+          Object.keys(histSheets).filter(k => k.startsWith(filename + '::')).forEach(k => delete histSheets[k]);
+          loadedFiles.splice(loadedFiles.indexOf(filename), 1);
+        }
+        for (const [sh, rows] of Object.entries(result.sheets)) {
+          histSheets[`${filename}::${sh}`] = rows;
+        }
+        loadedFiles.push(filename);
+        loaded++;
+        log(`  Drive: ${filename} (updated ${result.modified})`, 'ok');
+      } catch (e) {
         errors.push(filename);
-        log(`Drive error — ${filename}: ${err ? err.message : 'unknown error'}`, 'err');
-        continue;
+        log(`Drive error   ${filename}: ${e.message}`, 'err');
       }
-      if (!result) {
-        // File not found in folder — not an error, just skip
-        log(`Drive: ${filename} not found in folder — skipping`);
-        continue;
-      }
-
-      // Replace stale copy if previously loaded
-      if (loadedFiles.includes(filename)) {
-        Object.keys(histSheets)
-          .filter(k => k.startsWith(filename + '::'))
-          .forEach(k => delete histSheets[k]);
-        loadedFiles.splice(loadedFiles.indexOf(filename), 1);
-      }
-
-      // Store sheets under "filename::sheetName" namespace key
-      for (const [sh, rows] of Object.entries(result.sheets)) {
-        histSheets[`${filename}::${sh}`] = rows;
-      }
-      loadedFiles.push(filename);
-
-      // Record file metadata for mergedDataset.meta
-      mergedDataset.meta[filename] = {
-        modified: result.modified,
-        sheets:   Object.keys(result.sheets).length,
-        rows:     Object.values(result.sheets).reduce((s, r) => s + r.length, 0),
-      };
-
-      loaded++;
-      log(`✓ Drive: ${filename} — ${mergedDataset.meta[filename].sheets} sheet(s), ${mergedDataset.meta[filename].rows} rows (updated ${result.modified})`, 'ok');
     }
 
-    // Rebuild search indices + merged dataset
-    rebuildIndex(); // also calls buildMergedDataset() via hook below
+    rebuildIndex();
     renderFileList();
 
     if (loaded > 0) {
-      const errNote = errors.length ? ` (${errors.length} file(s) failed)` : '';
-      driveStatus(`✓ ${loaded}/${DRIVE_HIST_FILES.length} file(s) loaded from Drive${errNote}`, loaded === DRIVE_HIST_FILES.length ? 'ok' : 'loading');
-      log(`Drive sync complete — ${Object.keys(masterIdx).length} teams · ${mergedDataset.flat.length} total rows in merged dataset`, 'ok');
-      if (errors.length) log(`⚠ Failed files: ${errors.join(', ')}`, 'err');
+      driveStatus(`  ${loaded} file${loaded>1?'s':''} loaded from Drive`, 'ok');
+      log(`Drive sync complete   ${Object.keys(masterIdx).length} teams indexed`, 'ok');
       // Auto-load fixtures after history is ready
       await loadFixturesFromDrive(false);
     } else {
-      driveStatus('No history files found — check folder ID or run Apps Script', 'err');
+      driveStatus('No history files found   run Apps Script bulk download first', 'err');
     }
 
   } catch (e) {
@@ -1210,11 +1072,11 @@ async function loadFromDrive() {
   btn.disabled = false;
 }
 
-// ── Load fixtures from Drive (can be called standalone too) ────────
+// -- Load fixtures from Drive (can be called standalone too) --------
 async function loadFixturesFromDrive(needsSignIn = true) {
   const btn = document.getElementById('driveFixBtn');
   if (btn) btn.disabled = true;
-  driveFixStatus('Loading fixtures from Drive…', 'loading');
+  driveFixStatus('Loading fixtures from Drive ', 'loading');
 
   try {
     if (needsSignIn) {
@@ -1229,13 +1091,13 @@ async function loadFixturesFromDrive(needsSignIn = true) {
     const result = await driveDownloadFile(DRIVE_FIX_FILE, driveAccessToken);
 
     if (!result) {
-      driveFixStatus('Upcoming_Fixtures.xlsx not found — run fixturesUpdate() in Apps Script', 'err');
+      driveFixStatus('Upcoming_Fixtures.xlsx not found   run fixturesUpdate() in Apps Script', 'err');
       log('Drive fixtures: file not found in folder', 'err');
       if (btn) btn.disabled = false;
       return;
     }
 
-    // Load into fixSheets — merge all sheets
+    // Load into fixSheets   merge all sheets
     fixSheets = {};
     let totalRows = 0;
     for (const [sh, rows] of Object.entries(result.sheets)) {
@@ -1243,12 +1105,12 @@ async function loadFixturesFromDrive(needsSignIn = true) {
       totalRows += rows.length;
     }
 
-    driveFixStatus(`✓ ${totalRows} fixture${totalRows!==1?'s':''} loaded (updated ${result.modified})`, 'ok');
-    log(`✓ Drive fixtures: ${totalRows} upcoming fixtures loaded from ${Object.keys(fixSheets).length} sheet(s)`, 'ok');
+    driveFixStatus(`  ${totalRows} fixture${totalRows!==1?'s':''} loaded (updated ${result.modified})`, 'ok');
+    log(`  Drive fixtures: ${totalRows} upcoming fixtures loaded from ${Object.keys(fixSheets).length} sheet(s)`, 'ok');
 
     // Update the fixtures panel UI
     const stB = document.getElementById('stB');
-    if (stB) stB.textContent = `Drive · ${totalRows} fixtures · ${result.modified}`;
+    if (stB) stB.textContent = `Drive   ${totalRows} fixtures   ${result.modified}`;
     const cardB = document.getElementById('cardB');
     if (cardB) cardB.classList.add('active');
 
@@ -1273,7 +1135,7 @@ function loadScript(src) {
 
 function getGoogleAccessToken() {
   return new Promise((res, rej) => {
-    // Google OAuth2 implicit flow — opens a small popup for sign-in
+    // Google OAuth2 implicit flow   opens a small popup for sign-in
     const client = google.accounts.oauth2.initTokenClient({
       client_id: '591112365835-jgof6m331fql9vla8ep1fkqc4fq4f9mr.apps.googleusercontent.com',
       scope: 'https://www.googleapis.com/auth/drive',
@@ -1286,9 +1148,9 @@ function getGoogleAccessToken() {
   });
 }
 
-// ═══════════════════════════════════════════════
-// SETTINGS — save / load via localStorage
-// ═══════════════════════════════════════════════
+// ===============================================
+// SETTINGS   save / load via localStorage
+// ===============================================
 const SETTINGS_KEY = 'footballEngine_settings_v1';
 
 function saveSettings() {
@@ -1310,12 +1172,12 @@ function saveSettings() {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
     const el = document.getElementById('saveStatus');
     el.style.color = 'var(--accent)';
-    el.textContent = '✓ Saved ' + new Date().toLocaleTimeString();
+    el.textContent = '  Saved ' + new Date().toLocaleTimeString();
     setTimeout(() => { el.textContent = ''; }, 3000);
   } catch(e) {
     const el = document.getElementById('saveStatus');
     el.style.color = 'var(--a2)';
-    el.textContent = '✗ Save failed';
+    el.textContent = '  Save failed';
   }
 }
 
@@ -1325,7 +1187,7 @@ function loadSettings() {
     if (!raw) return;
     const s = JSON.parse(raw);
 
-    // Recency α
+    // Recency  
     if (s.decayAlpha !== undefined) {
       document.getElementById('decaySlider').value = s.decayAlpha;
       document.getElementById('decayVal').textContent = (parseInt(s.decayAlpha)/100).toFixed(2);
@@ -1365,10 +1227,10 @@ function loadSettings() {
   }
 }
 
-// ═══════════════════════════════════════════════
-// ═══════════════════════════════════════════════
+// ===============================================
+// ===============================================
 // MOBILE SIDEBAR TOGGLE
-// ═══════════════════════════════════════════════
+// ===============================================
 function toggleSidebar() {
   const sb = document.getElementById('mainSidebar');
   const btn = document.getElementById('sbToggle');
@@ -1389,9 +1251,9 @@ document.addEventListener('click', function(e) {
   }
 });
 
-// ═══════════════════════════════════════════════
-// LANDING PAGE — Sport Router
-// ═══════════════════════════════════════════════
+// ===============================================
+// LANDING PAGE   Sport Router
+// ===============================================
 function launchSport(sport) {
   if (sport !== 'football') return;
   document.getElementById('landingPage').style.display = 'none';
@@ -1451,55 +1313,51 @@ function resetApp() {
   closeDrawer();
 }
 
-// ═══════════════════════════════════════════════
+// ===============================================
 // STATE
-// ═══════════════════════════════════════════════
+// ===============================================
 let histSheets = {}, fixSheets = null;
 let masterIdx = {}, matchStore = {};
 let allRows = [], visRows = [], loadedFiles = [];
 
-// ═══════════════════════════════════════════════
+// ===============================================
 // COLUMN DETECTION
-// ═══════════════════════════════════════════════
+// ===============================================
 const C_HOME=['HomeTeam','Home Team','home_team','hometeam','home','Home','HT','h team'];
 const C_AWAY=['AwayTeam','Away Team','away_team','awayteam','away','Away','AT','a team'];
-// Google Drive sheet uses home_goals / away_goals
-const C_FTHG=['FTHG','fthg','HomeGoals','HG','Home Goals','Score H','GF','home goals','home_goals'];
-const C_FTAG=['FTAG','ftag','AwayGoals','AG','Away Goals','Score A','GA','away goals','away_goals'];
+const C_FTHG=['FTHG','fthg','HomeGoals','HG','Home Goals','Score H','GF','home goals'];
+const C_FTAG=['FTAG','ftag','AwayGoals','AG','Away Goals','Score A','GA','away goals'];
 const C_DATE=['Date','date','DATE','MatchDate','match_date'];
-// xG columns (optional — football-data.co.uk and Google Drive: HXG / AXG)
-const C_HXG =['HxG','Hxg','hxg','HomeXG','home_xg','xG_H','xGH','Home xG','HomexG','HXG'];
-const C_AXG =['AxG','Axg','axg','AwayXG','away_xg','xG_A','xGA_','Away xG','AwayxG','AXG'];
-// Shots on Target columns — Google Drive uses HSOT / ASOT
-const C_HST =['HST','hst','HomeST','home_sot','SOT_H','ShotsOnTargetH','home shots on target','hs','HSOT'];
-const C_AST =['AST','ast','AwayST','away_sot','SOT_A','ShotsOnTargetA','away shots on target','as','ASOT'];
-const DIV={E0:'Premier League',E1:'Championship',E2:'League One',E3:'League Two',EC:'National League',SC0:'Scottish Prem',SC1:'Scottish Champ',SC2:'Scottish L1',SC3:'Scottish L2',D1:'Bundesliga',D2:'Bundesliga 2',SP1:'La Liga',SP2:'La Liga 2',I1:'Serie A',I2:'Serie B',F1:'Ligue 1',F2:'Ligue 2',B1:'Belgian Pro',N1:'Eredivisie',P1:'Primeira Liga',T1:'Süper Lig',G1:'Super League GR'};
+// -- xG column aliases -----------------------------------------------
+const C_HXG =['HxG','hxg','HomeXG','home_xg','xg_home','xGH','xg_h','home xg','HomeExpectedGoals'];
+const C_AXG =['AxG','axg','AwayXG','away_xg','xg_away','xGA','xg_a','away xg','AwayExpectedGoals'];
+// -- Shots on Target column aliases ----------------------------------
+const C_HSOT=['HST','hst','HomeShotsOnTarget','home_sot','sot_home','HS_T','home_shots_target','HomeSoT'];
+const C_ASOT=['AST','ast','AwayShotsOnTarget','away_sot','sot_away','AS_T','away_shots_target','AwaySoT'];
+const DIV={E0:'Premier League',E1:'Championship',E2:'League One',E3:'League Two',EC:'National League',SC0:'Scottish Prem',SC1:'Scottish Champ',SC2:'Scottish L1',SC3:'Scottish L2',D1:'Bundesliga',D2:'Bundesliga 2',SP1:'La Liga',SP2:'La Liga 2',I1:'Serie A',I2:'Serie B',F1:'Ligue 1',F2:'Ligue 2',B1:'Belgian Pro',N1:'Eredivisie',P1:'Primeira Liga',T1:'S per Lig',G1:'Super League GR'};
 const divName=s=>DIV[s]||s;
 
 function findCol(s,als){const ks=Object.keys(s);for(const a of als){const n=a.toLowerCase().replace(/[\s_-]/g,'');const f=ks.find(k=>k.toLowerCase().replace(/[\s_-]/g,'')=== n);if(f)return f;}return null;}
-function getCols(rows,hA,aA,fA,gA){if(!rows.length)return null;const s=rows[0];return{home:findCol(s,hA),away:findCol(s,aA),fthg:fA?findCol(s,fA):null,ftag:gA?findCol(s,gA):null,date:findCol(s,C_DATE)};}
+function getCols(rows,hA,aA,fA,gA){if(!rows.length)return null;const s=rows[0];return{home:findCol(s,hA),away:findCol(s,aA),fthg:fA?findCol(s,fA):null,ftag:gA?findCol(s,gA):null,date:findCol(s,C_DATE),hxg:findCol(s,C_HXG),axg:findCol(s,C_AXG),hsot:findCol(s,C_HSOT),asot:findCol(s,C_ASOT)};}
 
-// ═══════════════════════════════════════════════
+// ===============================================
 // FUZZY MATCHING (Jaro-Winkler + token)
-// ═══════════════════════════════════════════════
+// ===============================================
 const SKIP=new Set(['fc','sc','ac','bc','cf','afc','osc','utd','united','city','the','de','la','le','rc','vfl','vfb','sv','sk','us','aj','og','ogc','rsc','calcio','club','sporting','hove','albion','amsterdam','rotterdam','enschede','seville','barcelona','turin','rome','glasgow','real','atletico','stade','olympique','inter','ss','as','cd','sd']);
 function tok(n){return n.toLowerCase().split(/[\s\-&.,\/]+/).filter(t=>t.length>1&&!SKIP.has(t));}
 function jaro(a,b){if(a===b)return 1;const l1=a.length,l2=b.length,md=Math.max(0,Math.floor(Math.max(l1,l2)/2)-1);const m1=new Array(l1).fill(false),m2=new Array(l2).fill(false);let mt=0;for(let i=0;i<l1;i++)for(let j=Math.max(0,i-md);j<Math.min(l2,i+md+1);j++)if(!m2[j]&&a[i]===b[j]){m1[i]=m2[j]=true;mt++;break;}if(!mt)return 0;let t=0,k=0;for(let i=0;i<l1;i++){if(!m1[i])continue;while(!m2[k])k++;if(a[i]!==b[k])t++;k++;}const jv=(mt/l1+mt/l2+(mt-t/2)/mt)/3;let p=0;for(let i=0;i<Math.min(4,l1,l2);i++){if(a[i]===b[i])p++;else break;}return jv+p*.1*(1-jv);}
 function tokSim(a,b){const ta=tok(a),tb=tok(b);if(!ta.length||!tb.length)return 0;const sa=new Set(ta),sb=new Set(tb);const ex=[...sa].filter(t=>sb.has(t)).length;if(ex>0)return ex/Math.min(sa.size,sb.size);let best=0;for(const x of ta)for(const y of tb)if(x.startsWith(y.slice(0,3))||y.startsWith(x.slice(0,3))){const s=jaro(x,y);if(s>best)best=s;}return best>=.82?best*.9:0;}
 function fuzzy(name,idx){const n=name.toLowerCase().trim();if(idx[n])return idx[n];let best=null,bs=0;for(const[k,v]of Object.entries(idx)){const s=tokSim(n,k);if(s>bs){bs=s;best=v;}}return bs>=.45?best:null;}
 
-// ═══════════════════════════════════════════════
+// ===============================================
 // MASTER INDEX + MATCH STORE
 // One unified index across ALL loaded files.
-// Same team across multiple files → matches merged.
-// ═══════════════════════════════════════════════
+// Same team across multiple files   matches merged.
+// ===============================================
 function buildMasterIndex(sheets){
   const idx={};
-  for(const[,rows_raw]of Object.entries(sheets)){
-    if(!rows_raw.length)continue;
-    let rows;
-    try { rows = preprocessDriveSheet(rows_raw); }
-    catch(e) { log('Column mapping error (index): ' + e.message, 'err'); continue; }
+  for(const[,rows]of Object.entries(sheets)){
+    if(!rows.length)continue;
     const c=getCols(rows,C_HOME,C_AWAY,null,null);
     if(!c||(!c.home&&!c.away))continue;
     const dateCol=findCol(rows[0],C_DATE);
@@ -1516,12 +1374,12 @@ function buildMasterIndex(sheets){
   return idx;
 }
 
-// ═══════════════════════════════════════════════
+// ===============================================
 // SEASON CUTOFF
 // Only matches on or after this date are used.
 // Updated each season (currently 2025/26).
-// ═══════════════════════════════════════════════
-const SEASON_START = new Date('2025-07-01'); // 1 July 2025 — covers all 2025/26 leagues
+// ===============================================
+const SEASON_START = new Date('2025-07-01'); // 1 July 2025   covers all 2025/26 leagues
 
 /**
  * Parse a date string from football-data.co.uk files.
@@ -1532,7 +1390,7 @@ function parseMatchDate(str) {
   if (!str || !str.trim()) return null;
   const s = str.trim();
 
-  // DD/MM/YY — 2-digit year: always treat as DD/MM (football-data.co.uk standard)
+  // DD/MM/YY   2-digit year: always treat as DD/MM (football-data.co.uk standard)
   let m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})$/);
   if (m) {
     let [, d, mo, y] = m;
@@ -1540,20 +1398,20 @@ function parseMatchDate(str) {
     return new Date(`${y}-${mo.padStart(2,'0')}-${d.padStart(2,'0')}`);
   }
 
-  // YYYY-MM-DD — ISO, unambiguous
+  // YYYY-MM-DD   ISO, unambiguous
   m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (m) return new Date(s);
 
-  // DD/MM/YYYY or MM/DD/YYYY — 4-digit year, disambiguate by value:
-  //   if first part > 12 it can't be a month  → must be DD/MM
-  //   if second part > 12 it can't be a day   → must be MM/DD
+  // DD/MM/YYYY or MM/DD/YYYY   4-digit year, disambiguate by value:
+  //   if first part > 12 it can't be a month    must be DD/MM
+  //   if second part > 12 it can't be a day     must be MM/DD
   //   when both <= 12, default to DD/MM (football-data.co.uk convention)
   m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (m) {
     const [, a, b, y] = m;
     const ai = parseInt(a, 10), bi = parseInt(b, 10);
     if (bi > 12) {
-      // b can't be a month → format must be MM/DD/YYYY
+      // b can't be a month   format must be MM/DD/YYYY
       return new Date(`${y}-${a.padStart(2,'0')}-${b.padStart(2,'0')}`);
     }
     // Default: DD/MM/YYYY (covers ai > 12 case too, as b is the month)
@@ -1569,124 +1427,35 @@ function isCurrentSeason(dateStr) {
   return d >= SEASON_START;
 }
 
-// ═══════════════════════════════════════════════
-// GOOGLE DRIVE SHEET PREPROCESSOR
-// Maps Google Drive column names → internal model names,
-// validates required columns, and casts all numeric values safely.
-// Column mapping:
-//   home_goals → FTHG  |  away_goals → FTAG
-//   HSOT       → HST   |  ASOT       → AST
-//   HXG        → HxG   |  AXG        → AxG  (nullable — missing = null, not 0)
-// ═══════════════════════════════════════════════
-const DRIVE_COLUMN_MAP = {
-  'home_goals': 'FTHG',
-  'away_goals': 'FTAG',
-  'HSOT':       'HST',
-  'ASOT':       'AST',
-  'HXG':        'HxG',
-  'AXG':        'AxG',
-};
-
-// Required Drive columns — xG columns are intentionally absent (optional).
-const DRIVE_REQUIRED_COLS = ['home_goals', 'away_goals', 'HSOT', 'ASOT'];
-
-/**
- * preprocessDriveSheet(rows)
- *
- * Inspects the header row. If it contains Google Drive column names
- * (home_goals / away_goals etc.) the rows are remapped to internal column
- * names so the existing pipeline sees a familiar schema.
- *
- * Required columns missing  -> throws a descriptive Error listing them.
- * xG (HXG / AXG) missing    -> silently omitted (treated as null downstream).
- * All numeric fields cast to float; goals default 0, SOT default 0,
- * xG default NaN (preserved as null in the model).
- *
- * Returns: array of remapped row objects, or the original rows unchanged
- * if no Drive-style columns are detected.
- */
-function preprocessDriveSheet(rows) {
-  if (!rows || !rows.length) return rows;
-
-  const header = Object.keys(rows[0]);
-  const headerSet = new Set(header);
-
-  // Detect whether this is a Drive-format sheet
-  const isDriveSheet = DRIVE_REQUIRED_COLS.some(col => headerSet.has(col));
-  if (!isDriveSheet) return rows; // Not a Drive sheet — pass through unchanged
-
-  // Validate all required columns are present
-  const missing = DRIVE_REQUIRED_COLS.filter(col => !headerSet.has(col));
-  if (missing.length) {
-    throw new Error(
-      'Google Drive sheet is missing required column(s): ' + missing.join(', ') + '. ' +
-      'Expected columns: ' + DRIVE_REQUIRED_COLS.join(', ') + '.'
-    );
-  }
-
-  const foundCols = Object.keys(DRIVE_COLUMN_MAP).filter(k => headerSet.has(k));
-  log('Drive sheet detected — remapping columns: ' + foundCols.join(', '), 'ok');
-
-  return rows.map(function(row) {
-    var out = Object.assign({}, row); // preserve unmapped columns (Date, HomeTeam…)
-
-    for (var src in DRIVE_COLUMN_MAP) {
-      var dst = DRIVE_COLUMN_MAP[src];
-      if (!(src in row)) continue; // column absent (e.g. HXG/AXG optional)
-
-      var raw = row[src];
-
-      if (src === 'HXG' || src === 'AXG') {
-        // xG: empty / non-numeric → NaN (null in model), never coerce to 0
-        var xv = parseFloat(raw);
-        out[dst] = (raw === '' || raw === null || raw === undefined || isNaN(xv)) ? NaN : xv;
-      } else {
-        // Goals and SOT: empty / non-numeric → safe default 0
-        var nv = parseFloat(raw);
-        out[dst] = isFinite(nv) ? nv : 0;
-      }
-
-      // Remove the original Drive key so downstream sees only internal names
-      if (src !== dst) delete out[src];
-    }
-
-    return out;
-  });
-}
-
 function buildMatchStore(sheets,idx){
   const store={};
   const en=k=>{if(!store[k])store[k]=[];};
-  for(const[,rows_raw]of Object.entries(sheets)){
-    if(!rows_raw.length)continue;
-    let rows;
-    try { rows = preprocessDriveSheet(rows_raw); }
-    catch(e) { log('Column mapping error: ' + e.message, 'err'); continue; }
+  for(const[,rows]of Object.entries(sheets)){
+    if(!rows.length)continue;
     const c=getCols(rows,C_HOME,C_AWAY,C_FTHG,C_FTAG);
     if(!c||!c.home||!c.away||!c.fthg||!c.ftag)continue;
-    // Optional signal columns — null when absent
-    const cHxg = findCol(rows[0], C_HXG);
-    const cAxg = findCol(rows[0], C_AXG);
-    const cHst = findCol(rows[0], C_HST);
-    const cAst = findCol(rows[0], C_AST);
     for(const r of rows){
       const hR=String(r[c.home]||'').trim(),aR=String(r[c.away]||'').trim();
       const hg=parseFloat(r[c.fthg]),ag=parseFloat(r[c.ftag]);
       if(!hR||!aR||isNaN(hg)||isNaN(ag))continue;
       const hC=fuzzy(hR,idx),aC=fuzzy(aR,idx);
       const dt=c.date?String(r[c.date]||'').trim():'';
-      // Current season filter — skip matches before SEASON_START
+      // Current season filter   skip matches before SEASON_START
       if (dt && !isCurrentSeason(dt)) continue;
-      // Parse optional signals safely
-      const hxg = cHxg ? (v=>isFinite(v)&&v>=0?v:null)(parseFloat(r[cHxg])) : null;
-      const axg = cAxg ? (v=>isFinite(v)&&v>=0?v:null)(parseFloat(r[cAxg])) : null;
-      const hst = cHst ? (v=>isFinite(v)&&v>=0?v:null)(parseFloat(r[cHst])) : null;
-      const ast = cAst ? (v=>isFinite(v)&&v>=0?v:null)(parseFloat(r[cAst])) : null;
-      if(hC){const k=hC.toLowerCase();en(k);store[k].push({scored:hg,conceded:ag,date:dt,opponent:aC||aR,venue:'H',hg,ag,xg:hxg,xga:axg,sot:hst,sot_faced:ast});}
-      if(aC){const k=aC.toLowerCase();en(k);store[k].push({scored:ag,conceded:hg,date:dt,opponent:hC||hR,venue:'A',hg,ag,xg:axg,xga:hxg,sot:ast,sot_faced:hst});}
+      // -- xG / SOT extraction (missing   undefined, never stored as 0) --
+      const hxgRaw=c.hxg?parseFloat(r[c.hxg]):NaN;
+      const axgRaw=c.axg?parseFloat(r[c.axg]):NaN;
+      const hsotRaw=c.hsot?parseFloat(r[c.hsot]):NaN;
+      const asotRaw=c.asot?parseFloat(r[c.asot]):NaN;
+      const hxg =isNaN(hxgRaw) ?undefined:hxgRaw;
+      const axg =isNaN(axgRaw) ?undefined:axgRaw;
+      const hsot=isNaN(hsotRaw)?undefined:hsotRaw;
+      const asot=isNaN(asotRaw)?undefined:asotRaw;
+      if(hC){const k=hC.toLowerCase();en(k);store[k].push({scored:hg,conceded:ag,date:dt,opponent:aC||aR,venue:'H',hg,ag,xg:hxg,xgC:axg,sot:hsot,sotC:asot});}
+      if(aC){const k=aC.toLowerCase();en(k);store[k].push({scored:ag,conceded:hg,date:dt,opponent:hC||hR,venue:'A',hg,ag,xg:axg,xgC:hxg,sot:asot,sotC:hsot});}
     }
   }
-  // Sort each team's matches chronologically (oldest → newest) so that
+  // Sort each team's matches chronologically (oldest   newest) so that
   // slice(-n) always returns the true most-recent N games regardless of
   // the order sheets were loaded or rows appeared in the source file.
   for (const k of Object.keys(store)) {
@@ -1701,9 +1470,9 @@ function buildMatchStore(sheets,idx){
   return store;
 }
 
-// ═══════════════════════════════════════════════
+// ===============================================
 // LEAGUE DETECTION
-// ═══════════════════════════════════════════════
+// ===============================================
 function detectLeague(home,away,sheets,idx){
   const rH=fuzzy(home,idx),rA=fuzzy(away,idx);
   if(!rH&&!rA)return'Unknown';
@@ -1713,16 +1482,16 @@ function detectLeague(home,away,sheets,idx){
   return divName(Object.entries(ct).sort((a,b)=>b[1]-a[1])[0][0]);
 }
 
-// ═══════════════════════════════════════════════
+// ===============================================
 // STATS ENGINE
-// ═══════════════════════════════════════════════
+// ===============================================
 function getTeamMatches(name){
   const can=fuzzy(name,masterIdx);
   if(!can)return[];
   return matchStore[can.toLowerCase()]||[];
 }
 
-// ── 
+// -- 
 // =============================================================
 // CONSERVATIVE O/U FILTER
 // Configurable thresholds at top level, never hardcoded in logic
@@ -1748,7 +1517,7 @@ function calcConservativeOU(lambdaTotal) {
 }
 
 function conservativeSignal(over35, under15) {
-  if (!useConservFilter) return { sig: "none", label: "—" };
+  if (!useConservFilter) return { sig: "none", label: " " };
   if (over35  >= OVER35_THRESHOLD)  return { sig: "over",  label: "Strong Over" };
   if (under15 >= UNDER15_THRESHOLD) return { sig: "under", label: "Strong Under" };
   return { sig: "none", label: "No Edge" };
@@ -1766,29 +1535,29 @@ function onConservChange() {
   if (typeof applyFilters === "function" && typeof allRows !== "undefined" && allRows.length) applyFilters();
 }
 
-// ═══════════════════════════════════════════════════════════════════════
-// ── TIME-AWARE MATCH FREQUENCY SYSTEM ────────────────────────────────
+// =======================================================================
+// -- TIME-AWARE MATCH FREQUENCY SYSTEM --------------------------------
 //
 // Replaces flat "last N matches" averaging with:
-//   1. Time-decay weighting  — recent matches weighted more by calendar days
-//   2. Match-congestion fatigue — teams playing 6 games in 14 days vs 2
-//   3. Rest-advantage boost  — extra days since last match = fresh legs
-//   4. Per-team adaptive window — window spans actual elapsed days, not a
+//   1. Time-decay weighting    recent matches weighted more by calendar days
+//   2. Match-congestion fatigue   teams playing 6 games in 14 days vs 2
+//   3. Rest-advantage boost    extra days since last match = fresh legs
+//   4. Per-team adaptive window   window spans actual elapsed days, not a
 //      fixed global 30-day cap, so every team is judged on its own schedule
 //
-// All adjustments feed into attack/defence λ values only.
-// Poisson formula, BTTS, O/U, DC model, Elo — all untouched.
-// ═══════════════════════════════════════════════════════════════════════
+// All adjustments feed into attack/defence   values only.
+// Poisson formula, BTTS, O/U, DC model, Elo   all untouched.
+// =======================================================================
 
-/** Global tuning constants — change here, affects the whole system. */
+/** Global tuning constants   change here, affects the whole system. */
 const FREQ_CONFIG = {
-  alpha:      0.08,   // time-decay rate: higher → older matches fall off faster
-  beta:       0.50,   // fatigue sensitivity: reduced from 0.70 — prevents over-penalisation
+  alpha:      0.08,   // time-decay rate: higher   older matches fall off faster
+  beta:       0.50,   // fatigue sensitivity: reduced from 0.70   prevents over-penalisation
   gamma:      0.02,   // rest-boost rate per extra day beyond league average (reduced from 0.03)
-  minMatches: 3,      // below this → return low-confidence defaults
-  lambdaMin:  0.30,   // hard floor for any λ output (raised from 0.10 — 0.10 is unrealistically low)
-  lambdaMax:  4.00,   // hard ceiling for any λ output (lowered from 5.00)
-  // Clamping bounds for adjustment factors — CRITICAL for realism
+  minMatches: 3,      // below this   return low-confidence defaults
+  lambdaMin:  0.30,   // hard floor for any   output (raised from 0.10   0.10 is unrealistically low)
+  lambdaMax:  4.00,   // hard ceiling for any   output (lowered from 5.00)
+  // Clamping bounds for adjustment factors   CRITICAL for realism
   fatigueMin: 0.80,   // fatigue factor lower bound (20% max penalty)
   fatigueMax: 1.10,   // fatigue factor upper bound (10% max boost for fresh teams)
   restMin:    0.95,   // rest boost lower bound (5% max penalty for no rest)
@@ -1812,7 +1581,7 @@ function _daysBetween(d1, d2) {
   return (d2 - d1) / 86400000;
 }
 
-// ── STEP 4: LEAGUE FREQUENCY BASELINE ────────────────────────────────
+// -- STEP 4: LEAGUE FREQUENCY BASELINE --------------------------------
 /**
  * computeLeagueFreqStats(matchStore)
  *
@@ -1833,7 +1602,7 @@ function computeLeagueFreqStats(store) {
   for (const matches of Object.values(store)) {
     if (matches.length < 2) continue;
 
-    // Sort ascending by date — some stores may have mixed order
+    // Sort ascending by date   some stores may have mixed order
     const dated = matches
       .map(m => ({ ...m, _d: _matchDate(m) }))
       .filter(m => m._d && !isNaN(m._d))
@@ -1865,10 +1634,10 @@ function computeLeagueFreqStats(store) {
   };
 }
 
-// Module-level cache — built once per Run alongside _leagueOSIs
+// Module-level cache   built once per Run alongside _leagueOSIs
 let _leagueFreqStats = { avgDensity: 0.14, avgRest: 7.0 };
 
-// ── STEPS 1–7: ADJUSTED LAMBDA ────────────────────────────────────────
+// -- STEPS 1 7: ADJUSTED LAMBDA ----------------------------------------
 /**
  * computeAdjustedLambda(name, n)
  *
@@ -1876,10 +1645,10 @@ let _leagueFreqStats = { avgDensity: 0.14, avgRest: 7.0 };
  *
  * Pipeline for a team's last N matches:
  *   1. Filter out matches with no parseable date; sort descending (recent first)
- *   2. Take up to N matches → define windowDays from newest to oldest
+ *   2. Take up to N matches   define windowDays from newest to oldest
  *   3. Assign each match a time-decay weight:
- *        w_i = exp(-alpha × daysAgo_i / windowDays)
- *      then normalise so Σw = 1
+ *        w_i = exp(-alpha   daysAgo_i / windowDays)
+ *      then normalise so  w = 1
  *   4. Compute time-weighted avgScored / avgConceded
  *   5. Compute match density and fatigueFactor
  *   6. Compute restBoost from days since the most recent match
@@ -1894,7 +1663,7 @@ function computeAdjustedLambda(name, n) {
   const cfg = FREQ_CONFIG;
   const all = getTeamMatches(name);
 
-  // ── edge case: too few matches ──────────────────────────────────────
+  // -- edge case: too few matches --------------------------------------
   if (all.length < cfg.minMatches) {
     return {
       scored: 1.2, conceded: 1.2,   // neutral-ish fallback
@@ -1906,7 +1675,7 @@ function computeAdjustedLambda(name, n) {
     };
   }
 
-  // ── STEP 10a: sort descending, skip undated ─────────────────────────
+  // -- STEP 10a: sort descending, skip undated -------------------------
   const now = new Date();
   const dated = all
     .map(m => ({ ...m, _d: _matchDate(m) }))
@@ -1924,14 +1693,14 @@ function computeAdjustedLambda(name, n) {
     };
   }
 
-  // ── STEP 3: adaptive window ─────────────────────────────────────────
+  // -- STEP 3: adaptive window -----------------------------------------
   const sample = dated.slice(0, n);          // most recent N (still descending)
   const N = sample.length;
   const newestDate = sample[0]._d;
   const oldestDate = sample[N - 1]._d;
   const windowDays = Math.max(1, _daysBetween(oldestDate, newestDate));
 
-  // ── STEP 2: time-decay weights ──────────────────────────────────────
+  // -- STEP 2: time-decay weights --------------------------------------
   // daysAgo_i measured from the newest match in the window (not today),
   // so the window is self-contained and doesn't penalise teams for
   // a long gap before their most recent game.
@@ -1942,11 +1711,11 @@ function computeAdjustedLambda(name, n) {
   const wSum = rawWeights.reduce((s, w) => s + w, 0) || 1;
   const weights = rawWeights.map(w => w / wSum);
 
-  // ── time-weighted base λ ────────────────────────────────────────────
+  // -- time-weighted base   --------------------------------------------
   const baseScored   = sample.reduce((s, m, i) => s + m.scored   * weights[i], 0);
   const baseConceded = sample.reduce((s, m, i) => s + m.conceded * weights[i], 0);
 
-  // ── STEP 5: fatigue factor ──────────────────────────────────────────
+  // -- STEP 5: fatigue factor ------------------------------------------
   const density = N / windowDays;                             // matches per day
   const avgDensity = _leagueFreqStats.avgDensity || 0.14;
   const densityFactor = avgDensity > 0 ? density / avgDensity : 1.0;
@@ -1955,24 +1724,24 @@ function computeAdjustedLambda(name, n) {
   const rawFatigue = 1 / (1 + cfg.beta * (densityFactor - 1));
   const fatigueFactor = Math.max(cfg.fatigueMin || 0.80, Math.min(cfg.fatigueMax || 1.10, rawFatigue));
 
-  // ── STEP 6: rest boost ──────────────────────────────────────────────
+  // -- STEP 6: rest boost ----------------------------------------------
   const lastRestDays = _daysBetween(newestDate, now);        // days since last match
   const avgRest = _leagueFreqStats.avgRest || 7.0;
-  // Symmetric and bounded: max ±10% adjustment from rest
+  // Symmetric and bounded: max  10% adjustment from rest
   const rawRestBoost = 1 + cfg.gamma * (lastRestDays - avgRest);
   const restBoost = Math.max(cfg.restMin || 0.95, Math.min(cfg.restMax || 1.10, rawRestBoost));
 
-  // ── STEP 7: apply adjustments ───────────────────────────────────────
+  // -- STEP 7: apply adjustments ---------------------------------------
   // Attack suffers from fatigue AND can benefit from rest
-  // Defence suffers from fatigue (tired teams defend worse) — divide by factor
+  // Defence suffers from fatigue (tired teams defend worse)   divide by factor
   const adjScored   = baseScored   * fatigueFactor * restBoost;
-  const adjConceded = baseConceded / fatigueFactor;           // fatigued → leakier
+  const adjConceded = baseConceded / fatigueFactor;           // fatigued   leakier
 
-  // ── STEP 10d: clamp extremes ────────────────────────────────────────
+  // -- STEP 10d: clamp extremes ----------------------------------------
   const scored   = Math.max(cfg.lambdaMin, Math.min(cfg.lambdaMax, adjScored));
   const conceded = Math.max(cfg.lambdaMin, Math.min(cfg.lambdaMax, adjConceded));
 
-  // ── confidence: how much did adjustments move the base? ─────────────
+  // -- confidence: how much did adjustments move the base? -------------
   const attackDrift  = baseScored   > 0 ? Math.abs(scored   - baseScored)   / baseScored   : 0;
   const defenceDrift = baseConceded > 0 ? Math.abs(conceded - baseConceded) / baseConceded : 0;
   const confidence   = Math.max(0, 1 - (attackDrift + defenceDrift) / 2);
@@ -1994,9 +1763,9 @@ function computeAdjustedLambda(name, n) {
   };
 }
 
-// ── BACKWARD-COMPATIBLE rawTeamLambda ────────────────────────────────
+// -- BACKWARD-COMPATIBLE rawTeamLambda --------------------------------
 /**
- * rawTeamLambda — kept for computeOSI() which needs a plain average
+ * rawTeamLambda   kept for computeOSI() which needs a plain average
  * (opponent strength is intentionally unweighted to avoid recursion).
  * Now delegates to computeAdjustedLambda so OSI also benefits from
  * time-decay while staying single-stage with no opponent chains.
@@ -2006,13 +1775,13 @@ function rawTeamLambda(name, n) {
   return { scored: r.scored, conceded: r.conceded, n: r.n };
 }
 
-// ── ONE-STAGE OPPONENT-STRENGTH NORMALIZATION ──
+// -- ONE-STAGE OPPONENT-STRENGTH NORMALIZATION --
 // Rules: no recursion, no opponent chains,
 //        opponent stats are always raw, last N only.
 
 /**
- * OSI (Opponent Strength Index) — ONE-STAGE, uses raw lambdas only.
- * OSI = rawScored(O) − rawConceded(O)
+ * OSI (Opponent Strength Index)   ONE-STAGE, uses raw lambdas only.
+ * OSI = rawScored(O)   rawConceded(O)
  * Positive = strong team, negative = weak team.
  */
 function computeOSI(opponentName,n){
@@ -2024,8 +1793,8 @@ function computeOSI(opponentName,n){
  * Build league-wide OSI list for z-score normalisation.
  * Called once per Run so the distribution is stable.
  */
-// ═══════════════════════════════════════════════════════════════════════
-// ── ATTACK / DEFENCE STRENGTH MODEL + HOME ADVANTAGE ──────────────────
+// =======================================================================
+// -- ATTACK / DEFENCE STRENGTH MODEL + HOME ADVANTAGE ------------------
 //
 // For each league, compute:
 //   leagueAvgScored   = mean goals scored per game across all teams
@@ -2037,13 +1806,13 @@ function computeOSI(opponentName,n){
 //   attackRating  = team_avg_scored   / leagueAvgScored
 //   defenceRating = team_avg_conceded / leagueAvgConceded
 //
-// Final λ (Dixon-Coles style):
-//   λ_home = homeAttack  × awayDefence  × leagueAvgScored  × homeAdvFactor
-//   λ_away = awayAttack  × homeDefence  × leagueAvgScored  × awayAdvFactor
+// Final   (Dixon-Coles style):
+//    _home = homeAttack    awayDefence    leagueAvgScored    homeAdvFactor
+//    _away = awayAttack    homeDefence    leagueAvgScored    awayAdvFactor
 //
 // homeAdvFactor = sqrt(homeAdv),  awayAdvFactor = 1/sqrt(homeAdv)
 // Using sqrt so both sides share the adjustment symmetrically.
-// ═══════════════════════════════════════════════════════════════════════
+// =======================================================================
 
 let _leagueParams = {};      // populated on each Run, keyed by league name
 let _teamRatings  = {};      // populated on each Run, keyed by team canonical name
@@ -2061,17 +1830,8 @@ function buildLeagueParams(n, alpha=1.0) {
     const c = getCols(rows, C_HOME, C_AWAY, C_FTHG, C_FTAG);
     if (!c || !c.home || !c.away || !c.fthg || !c.ftag) continue;
     const league = divName(sh);
-    if (!leagueGoals[league]) leagueGoals[league] = {
-      homeGoals:0, awayGoals:0, homeGames:0, awayGames:0,
-      sumHxg:0, sumAxg:0, xgGames:0,
-      sumHst:0, sumAst:0, sotGames:0
-    };
+    if (!leagueGoals[league]) leagueGoals[league] = { homeGoals:0, awayGoals:0, homeGames:0, awayGames:0 };
     const lg = leagueGoals[league];
-    // Optional signal columns
-    const cHxg = findCol(rows[0], C_HXG);
-    const cAxg = findCol(rows[0], C_AXG);
-    const cHst = findCol(rows[0], C_HST);
-    const cAst = findCol(rows[0], C_AST);
     for (const r of rows) {
       const dt = c.date ? String(r[c.date]||'').trim() : '';
       if (dt && !isCurrentSeason(dt)) continue; // current season only
@@ -2079,20 +1839,6 @@ function buildLeagueParams(n, alpha=1.0) {
       if (isNaN(hg) || isNaN(ag)) continue;
       lg.homeGoals += hg; lg.awayGoals += ag;
       lg.homeGames++; lg.awayGames++;
-      // xG accumulation
-      if (cHxg && cAxg) {
-        const hx = parseFloat(r[cHxg]), ax = parseFloat(r[cAxg]);
-        if (isFinite(hx) && hx >= 0 && isFinite(ax) && ax >= 0) {
-          lg.sumHxg += hx; lg.sumAxg += ax; lg.xgGames++;
-        }
-      }
-      // SOT accumulation
-      if (cHst && cAst) {
-        const hs = parseFloat(r[cHst]), as_ = parseFloat(r[cAst]);
-        if (isFinite(hs) && hs >= 0 && isFinite(as_) && as_ >= 0) {
-          lg.sumHst += hs; lg.sumAst += as_; lg.sotGames++;
-        }
-      }
     }
   }
 
@@ -2108,11 +1854,7 @@ function buildLeagueParams(n, alpha=1.0) {
     // Distribute symmetrically using sqrt
     const homeAdvFactor = Math.sqrt(homeAdv);
     const awayAdvFactor = 1 / homeAdvFactor;
-    // League-level xG averages (null when no xG data present)
-    const avgXg  = lg.xgGames  > 0 ? (lg.sumHxg + lg.sumAxg) / (2 * lg.xgGames) : null;
-    // League-level SOT averages (null when no SOT data present)
-    const avgSot = lg.sotGames > 0 ? (lg.sumHst + lg.sumAst) / (2 * lg.sotGames) : null;
-    params[league] = { avgScored, avgHome, avgAway, homeAdv, homeAdvFactor, awayAdvFactor, avgXg, avgSot };
+    params[league] = { avgScored, avgHome, avgAway, homeAdv, homeAdvFactor, awayAdvFactor };
   }
   return params;
 }
@@ -2133,7 +1875,7 @@ function buildTeamRatings(n, leagueParams, alpha=1.0) {
     const avgScored   = sample.reduce((s,m,i) => s + m.scored   * dw[i], 0);
     const avgConceded = sample.reduce((s,m,i) => s + m.conceded * dw[i], 0);
 
-    // Find this team's league from leagueParams — pick the league with most coverage
+    // Find this team's league from leagueParams   pick the league with most coverage
     // Fall back to overall average if league unknown
     const leagueAvg = (() => {
       // Find canonical name
@@ -2177,9 +1919,9 @@ function buildTeamRatings(n, leagueParams, alpha=1.0) {
 }
 
 /**
- * Compute Dixon-Coles style λ for a fixture using attack/defence ratings.
- * λ_home = homeAttack × awayDefence × leagueAvg × homeAdvFactor
- * λ_away = awayAttack × homeDefence × leagueAvg × awayAdvFactor
+ * Compute Dixon-Coles style   for a fixture using attack/defence ratings.
+ *  _home = homeAttack   awayDefence   leagueAvg   homeAdvFactor
+ *  _away = awayAttack   homeDefence   leagueAvg   awayAdvFactor
  * Falls back to raw average if ratings unavailable.
  */
 function dcLambda(homeKey, awayKey, league) {
@@ -2215,18 +1957,18 @@ function dcLambda(homeKey, awayKey, league) {
 }
 
 /**
- * decayWeights(N, alpha) — exponential decay weights for a sample of N games.
+ * decayWeights(N, alpha)   exponential decay weights for a sample of N games.
  * Index 0 = oldest game, index N-1 = most recent game.
- * w(i) = alpha^(N-1-i)   so most recent = 1.0, one back = alpha, two back = alpha^2 …
+ * w(i) = alpha^(N-1-i)   so most recent = 1.0, one back = alpha, two back = alpha^2  
  * Returns array of weights already normalised to sum=1.
- * alpha=1.0 → uniform weights (no recency bias)
- * alpha=0.85 → moderate recency emphasis
- * alpha=0.70 → strong recency emphasis
+ * alpha=1.0   uniform weights (no recency bias)
+ * alpha=0.85   moderate recency emphasis
+ * alpha=0.70   strong recency emphasis
  */
 function decayWeights(N, alpha) {
   if (N <= 0) return [];
   if (alpha >= 0.999) {
-    // uniform — avoid tiny float drift
+    // uniform   avoid tiny float drift
     return Array(N).fill(1/N);
   }
   const raw = Array.from({length: N}, (_, i) => Math.pow(alpha, N - 1 - i));
@@ -2250,12 +1992,12 @@ function buildLeagueOSIs(n,alpha=1.0){
 }
 
 /**
- * Convert OSI → Match Weight Factor (MWF).
+ * Convert OSI   Match Weight Factor (MWF).
  * Z-score normalised against the league distribution.
- * MWF = clamp(1.0 + 0.35·z,  0.40, 1.70)
- *   Weak opponent  → ~0.4–0.7
- *   Average        → ~0.9–1.1
- *   Strong         → ~1.3–1.7
+ * MWF = clamp(1.0 + 0.35 z,  0.40, 1.70)
+ *   Weak opponent    ~0.4 0.7
+ *   Average          ~0.9 1.1
+ *   Strong           ~1.3 1.7
  */
 function osiToMWF(osi,leagueOSIs){
   if(!leagueOSIs||!leagueOSIs.length)return 1.0;
@@ -2266,8 +2008,8 @@ function osiToMWF(osi,leagueOSIs){
 }
 
 /**
- * Adjusted λ — weighted average using per-match MWF.
- * λ_adj = Σ(goals_m × MWF_m) / Σ(MWF_m)
+ * Adjusted     weighted average using per-match MWF.
+ *  _adj =  (goals_m   MWF_m) /  (MWF_m)
  * Opponent stats are ALWAYS raw (no recursion, no chains).
  */
 function adjustedTeamLambda(name,n,leagueOSIs,alpha=1.0){
@@ -2280,7 +2022,7 @@ function adjustedTeamLambda(name,n,leagueOSIs,alpha=1.0){
     const osi=computeOSI(m.opponent,n);
     return osiToMWF(osi,leagueOSIs);
   });
-  // Combined weight = OSI weight × decay weight, then normalise
+  // Combined weight = OSI weight   decay weight, then normalise
   const combined=mwfs.map((mwf,i)=>mwf*dw[i]);
   const wSum=combined.reduce((s,w)=>s+w,0)||1;
   const scored   = sample.reduce((s,m,i)=>s+m.scored   *combined[i],0)/wSum;
@@ -2297,11 +2039,11 @@ function adjustedTeamLambda(name,n,leagueOSIs,alpha=1.0){
 }
 
 
-// ═══════════════════════════════════════════════════════════════════════
-// ── B) SEASONAL ELO MODEL ──────────────────────────────────────────────
+// =======================================================================
+// -- B) SEASONAL ELO MODEL ----------------------------------------------
 // Rules: current-season only, equal start ratings, no recursion,
 //        no historical bias, performance-based only.
-// ═══════════════════════════════════════════════════════════════════════
+// =======================================================================
 
 const ELO_K = 32;        // K-factor
 const ELO_BASE = 1000;   // all teams start equal
@@ -2385,11 +2127,11 @@ function eloMatchProb(homeKey, awayKey) {
   };
 }
 
-// ═══════════════════════════════════════════════════════════════════════
-// ── C) FORM REGRESSION MODEL ──────────────────────────────────────────
+// =======================================================================
+// -- C) FORM REGRESSION MODEL ------------------------------------------
 // Trend-based: detects momentum, slope, acceleration.
 // Uses last N matches only; no historical seasons.
-// ═══════════════════════════════════════════════════════════════════════
+// =======================================================================
 
 /** Minimum sample size for reliable form regression */
 const FORM_MIN_SAMPLE = 4;
@@ -2400,7 +2142,7 @@ const FORM_SHRINKAGE_K = 5; // pseudo-count of "average" matches added
 
 /**
  * Shrink a value toward a prior mean using James-Stein style shrinkage.
- * shrunk = (n·value + k·prior) / (n + k)
+ * shrunk = (n value + k prior) / (n + k)
  * where k = FORM_SHRINKAGE_K, prior = grand mean of the metric.
  */
 function shrinkToward(value, n, prior) {
@@ -2416,7 +2158,7 @@ function shrinkToward(value, n, prior) {
  * Improvements vs original:
  *   - Minimum sample size guard (returns neutral defaults if too few matches)
  *   - Slope shrinkage toward 0 (the prior: no trend) using sample size
- *   - Acceleration bounded by sample availability (needs N≥4)
+ *   - Acceleration bounded by sample availability (needs N 4)
  *   - bttsFactor: purely from Poisson average goals, NOT from slope
  *     (slope is a trend signal, not a goals-rate signal)
  *   - Volatility uses Bessel-corrected std for small samples
@@ -2424,7 +2166,7 @@ function shrinkToward(value, n, prior) {
 function formTrendStats(name, n, alpha=1.0) {
   const all = getTeamMatches(name);
 
-  // Return neutral defaults if too few matches — avoids spurious slope/accel
+  // Return neutral defaults if too few matches   avoids spurious slope/accel
   if (all.length < FORM_MIN_SAMPLE) {
     return { slope: 0, accel: 0, momentum: 0, volatility: 1, trend: 'neutral', bttsFactor: 0.5, lowConf: true };
   }
@@ -2448,11 +2190,11 @@ function formTrendStats(name, n, alpha=1.0) {
   }
   const rawSlope = den > 0 ? num / den : 0;
 
-  // Shrink slope toward 0 (prior: no trend) — prevents instability with small N
+  // Shrink slope toward 0 (prior: no trend)   prevents instability with small N
   // The more matches we have, the less we shrink
   const slope = shrinkToward(rawSlope, N, 0);
 
-  // Acceleration: only reliable with N ≥ 4; otherwise set to 0
+  // Acceleration: only reliable with N   4; otherwise set to 0
   let accel = 0;
   if (N >= 4) {
     const mid = Math.floor(N / 2);
@@ -2485,7 +2227,7 @@ function formTrendStats(name, n, alpha=1.0) {
   // Formula: base 0.3 + scoring component (0 to 0.35) + conceding component (0 to 0.35)
   const avgScored   = sample.reduce((s,m,i) => s + m.scored   * dw[i], 0);
   const avgConceded = sample.reduce((s,m,i) => s + m.conceded * dw[i], 0);
-  // Shrink both toward league average (≈1.3 goals)
+  // Shrink both toward league average ( 1.3 goals)
   const shrunkScored   = shrinkToward(avgScored,   N, 1.3);
   const shrunkConceded = shrinkToward(avgConceded, N, 1.3);
   const bttsFactor = Math.min(0.92, Math.max(0.08,
@@ -2503,36 +2245,36 @@ function formTrendStats(name, n, alpha=1.0) {
   };
 }
 
-// ═══════════════════════════════════════════════════════════════════════
-// ── DIXON-COLES RHO CORRECTION & CORRELATION-AWARE BTTS ───────────────
+// =======================================================================
+// -- DIXON-COLES RHO CORRECTION & CORRELATION-AWARE BTTS ---------------
 //
 // Dixon-Coles (1997) correction applies only to low-score cells:
-//   τ(x, y, λ, μ, ρ) = {
-//     1 − λμρ          if x=0, y=0
-//     1 + λρ           if x=0, y=1
-//     1 + μρ           if x=1, y=0
-//     1 − ρ            if x=1, y=1
+//    (x, y,  ,  ,  ) = {
+//     1                if x=0, y=0
+//     1 +              if x=0, y=1
+//     1 +              if x=1, y=0
+//     1                if x=1, y=1
 //     1                otherwise
 //   }
 //
-// BTTS = P(home ≥ 1) ∧ P(away ≥ 1)
-//      = 1 − P(home=0) − P(away=0) + P(home=0, away=0)
+// BTTS = P(home   1)   P(away   1)
+//      = 1   P(home=0)   P(away=0) + P(home=0, away=0)
 //
 // With DC correction the joint probability P(x,y) is:
-//   P(x,y) = Poisson(x|λ) · Poisson(y|μ) · τ(x, y, λ, μ, ρ)
+//   P(x,y) = Poisson(x| )   Poisson(y| )    (x, y,  ,  ,  )
 //
 // So the DC-adjusted P(0,0) changes, which changes BTTS.
-// ρ is typically negative (−0.13 is the original DC estimate) meaning
+//   is typically negative ( 0.13 is the original DC estimate) meaning
 // 0-0 draws are less likely than independent Poisson implies.
 //
-// ρ is bounded ∈ (−1/λμ, 1/max(λ,μ)) to keep τ values in (0, ∞).
-// ═══════════════════════════════════════════════════════════════════════
+//   is bounded   ( 1/  , 1/max( , )) to keep   values in (0,  ).
+// =======================================================================
 
 /** Clamp rho to a valid range given lambdaHome, lambdaAway */
 function clampRho(rho, lH, lA) {
   if (!isFinite(lH) || !isFinite(lA) || lH <= 0 || lA <= 0) return 0;
-  const loBound = -1 / (lH * lA);       // keeps τ(0,0) > 0
-  const hiBound =  1 / Math.max(lH, lA); // keeps all τ values positive
+  const loBound = -1 / (lH * lA);       // keeps  (0,0) > 0
+  const hiBound =  1 / Math.max(lH, lA); // keeps all   values positive
   return Math.max(loBound + 1e-6, Math.min(hiBound - 1e-6, rho));
 }
 
@@ -2549,8 +2291,8 @@ function poissonPMF(k, lambda) {
 }
 
 /**
- * Dixon-Coles τ correction factor for low-score cells.
- * τ(x, y, λ, μ, ρ)
+ * Dixon-Coles   correction factor for low-score cells.
+ *  (x, y,  ,  ,  )
  */
 function dcTau(x, y, lH, lA, rho) {
   if (x === 0 && y === 0) return 1 - lH * lA * rho;
@@ -2566,21 +2308,21 @@ function dcTau(x, y, lH, lA, rho) {
  * Method: enumerate joint probabilities for low-score outcomes that
  * affect BTTS, then compute remainder analytically.
  *
- * BTTS = 1 − P(H=0) − P(A=0) + P(H=0,A=0)
+ * BTTS = 1   P(H=0)   P(A=0) + P(H=0,A=0)
  *
  * The DC correction modifies P(0,0), P(0,1), P(1,0), P(1,1).
  * P(H=0) = P(0,0) + P(0,1) + P(0,2) + ... (all corrected for x=0 cells)
- * But only (0,0) and (0,1) receive DC correction; (0,y≥2) use raw Poisson.
+ * But only (0,0) and (0,1) receive DC correction; (0,y 2) use raw Poisson.
  *
  * Full formula:
- *   P(H=0) corrected = Σ_{y≥0} Poisson(0|λ)·Poisson(y|μ)·τ(0,y,λ,μ,ρ)
- *                    = Poisson(0|λ) · [Poisson(0|μ)·τ(0,0) + Poisson(1|μ)·τ(0,1) + Σ_{y≥2} Poisson(y|μ)]
- *                    = Poisson(0|λ) · [Poisson(0|μ)·(1−λμρ) + Poisson(1|μ)·(1+λρ) + (1−Poisson(0|μ)−Poisson(1|μ))]
+ *   P(H=0) corrected =  _{y 0} Poisson(0| ) Poisson(y| )  (0,y, , , )
+ *                    = Poisson(0| )   [Poisson(0| )  (0,0) + Poisson(1| )  (0,1) +  _{y 2} Poisson(y| )]
+ *                    = Poisson(0| )   [Poisson(0| ) (1    ) + Poisson(1| ) (1+  ) + (1 Poisson(0| ) Poisson(1| ))]
  *
  * @param {number} lH - Home expected goals (lambda)
  * @param {number} lA - Away expected goals (mu)
  * @param {number} [rho=-0.13] - DC correlation parameter
- * @returns {number} BTTS probability ∈ [0, 1]
+ * @returns {number} BTTS probability   [0, 1]
  */
 function dcBTTS(lH, lA, rho = -0.13) {
   // Guard: invalid lambdas
@@ -2601,11 +2343,11 @@ function dcBTTS(lH, lA, rho = -0.13) {
   const p10 = p1H * p0A * dcTau(1, 0, lH, lA, r);  // 1-0
   const p11 = p1H * p1A * dcTau(1, 1, lH, lA, r);  // 1-1
 
-  // P(H=0) with DC correction on y=0 and y=1 cells; y≥2 are raw Poisson
-  // Σ_{y≥2} Poisson(y|lA) = 1 - p0A - p1A
+  // P(H=0) with DC correction on y=0 and y=1 cells; y 2 are raw Poisson
+  //  _{y 2} Poisson(y|lA) = 1 - p0A - p1A
   const pH0_corrected = p00 + p01 + p0H * (1 - p0A - p1A);
 
-  // P(A=0) with DC correction on x=0 and x=1 cells; x≥2 are raw Poisson
+  // P(A=0) with DC correction on x=0 and x=1 cells; x 2 are raw Poisson
   const pA0_corrected = p00 + p10 + p0A * (1 - p0H - p1H);
 
   // DC-corrected P(H=0, A=0) = p00 (already computed)
@@ -2620,7 +2362,7 @@ function dcBTTS(lH, lA, rho = -0.13) {
  * Estimate rho from data.
  * Simple data-driven approach: if low-scoring matches are less common
  * than Poisson predicts, rho is negative (the typical football finding).
- * Falls back to DC original estimate of −0.13 when insufficient data.
+ * Falls back to DC original estimate of  0.13 when insufficient data.
  *
  * @param {Array} matches - Array of {hg, ag} match objects
  * @returns {number} Estimated rho
@@ -2641,16 +2383,16 @@ function estimateRho(matches) {
   if (expected00 <= 0) return -0.13;
   // If observed 0-0 < expected, rho is negative
   const ratio = count00 / expected00;
-  // Map ratio to rho: ratio=1 → rho=0, ratio<1 → negative rho
+  // Map ratio to rho: ratio=1   rho=0, ratio<1   negative rho
   const rawRho = (ratio - 1) / (lH * lA);
-  return Math.max(-0.25, Math.min(0.0, rawRho)); // keep rho ≤ 0 (football finding)
+  return Math.max(-0.25, Math.min(0.0, rawRho)); // keep rho   0 (football finding)
 }
 
-// ═══════════════════════════════════════════════════════════════════════
-// ── ENSEMBLE FUSION ENGINE ────────────────────────────────────────────
+// =======================================================================
+// -- ENSEMBLE FUSION ENGINE --------------------------------------------
 // Fuses Poisson, Elo, Form outputs using configurable weights.
 // w1 + w2 + w3 = 1 (normalised automatically if they don't sum exactly)
-// ═══════════════════════════════════════════════════════════════════════
+// =======================================================================
 
 let ensMode = 'poisson';   // 'poisson' | 'ensemble'
 
@@ -2671,6 +2413,151 @@ function getConfWeights() {
   const total = Math.max(1, a + b + g + d);
   return { alpha: a/total, beta: b/total, gamma: g/total, delta: d/total };
 }
+
+/**
+// =======================================================================
+// -- xG / SOT MODEL LAYER ---------------------------------------------
+// Optional supplementary model. Activates ONLY when reliable xG or SOT
+// data is present for BOTH teams. Contributes a low-weight ( 0.08)
+// signal to fuseOutcomes(). Never modifies Poisson/DC lambdas.
+//
+// Availability rule:
+//   A stat is "available" if value > 0  OR  (N   3 AND value == 0)
+//   i.e. zero is treated as missing for teams with >3 matches.
+//
+// Weighting rules (within the xgSot signal itself):
+//   BOTH xG + SOT   goals 70%, xG 20%, SOT 10%
+//   ONLY xG         goals 80%, xG 20%
+//   ONLY SOT        goals 90%, SOT 10%
+//   NONE            return null (no effect on ensemble)
+// =======================================================================
+
+/**
+ * Determine whether a stat value is genuinely available.
+ * @param {number|undefined} val  - Accumulated average value
+ * @param {number}           N    - Number of matches in sample
+ * @returns {boolean}
+ */
+function xgStatAvailable(val, N) {
+  if (val === undefined || val === null || !isFinite(val)) return false;
+  if (val > 0) return true;                  // positive value   available
+  if (N <= 3 && val === 0) return true;      // tiny sample: treat 0 as valid
+  return false;                              // zero with enough games   missing
+}
+
+/**
+ * Compute a team's weighted attacking strength from goals, xG, SOT.
+ * Returns a single scalar representing expected goals-for rate.
+ *
+ * @param {Object} teamMatchSample  - Recent matches array (last N)
+ * @param {Array}  decayW           - Decay weights aligned to sample
+ * @returns {{ strength: number, hasXg: boolean, hasSot: boolean }}
+ */
+function xgTeamStrength(teamMatchSample, decayW) {
+  const N = teamMatchSample.length;
+  if (!N) return { strength: 0, hasXg: false, hasSot: false };
+
+  let sumGoals = 0, sumXg = 0, sumSot = 0;
+  let xgCount = 0, sotCount = 0;
+
+  for (let i = 0; i < N; i++) {
+    const m = teamMatchSample[i];
+    const w = decayW[i] || 1 / N;
+    sumGoals += m.scored * w;
+    if (m.xg !== undefined && isFinite(m.xg)) { sumXg  += m.xg  * w; xgCount++; }
+    if (m.sot !== undefined && isFinite(m.sot)){ sumSot += m.sot * w; sotCount++; }
+  }
+
+  // Average per-game values
+  const avgGoals = sumGoals;                  // already decay-weighted sum
+  const avgXg    = xgCount  > 0 ? sumXg  : 0;
+  const avgSot   = sotCount > 0 ? sumSot  : 0;
+
+  // Availability check (using per-game averages as the "value")
+  const hasXg  = xgStatAvailable(avgXg,  N);
+  const hasSot = xgStatAvailable(avgSot, N);
+
+  let strength;
+  if (hasXg && hasSot) {
+    // BOTH available: goals 70%, xG 20%, SOT proxy 10%
+    // SOT proxy: normalise SOT to goal-equivalent (typical ~3.5 SOT per goal)
+    const sotGoalEquiv = avgSot / 3.5;
+    strength = 0.70 * avgGoals + 0.20 * avgXg + 0.10 * sotGoalEquiv;
+  } else if (hasXg) {
+    // ONLY xG: goals 80%, xG 20%
+    strength = 0.80 * avgGoals + 0.20 * avgXg;
+  } else if (hasSot) {
+    // ONLY SOT: goals 90%, SOT proxy 10%
+    const sotGoalEquiv = avgSot / 3.5;
+    strength = 0.90 * avgGoals + 0.10 * sotGoalEquiv;
+  } else {
+    // NONE: goals only (100%)   but caller should check hasXg/hasSot
+    strength = avgGoals;
+  }
+
+  return {
+    strength: isFinite(strength) && strength >= 0 ? strength : avgGoals,
+    hasXg,
+    hasSot
+  };
+}
+
+/**
+ * xgSotModel   Optional supplementary probability model.
+ *
+ * Returns { homeWin, draw, awayWin } adjustments or null if data is absent.
+ * The draw is anchored to a neutral 0.20 baseline (not inflated/deflated
+ * by xG/SOT because draw prediction requires more context than goal-rate alone).
+ *
+ * @param {Object} hSample - Home team recent match array (last N)
+ * @param {Object} aSample - Away team recent match array (last N)
+ * @param {Array}  hDecay  - Decay weights for home sample
+ * @param {Array}  aDecay  - Decay weights for away sample
+ * @returns {{ homeWin: number, draw: number, awayWin: number }|null}
+ */
+function xgSotModel(hSample, aSample, hDecay, aDecay) {
+  if (!hSample.length || !aSample.length) return null;
+
+  const hStr = xgTeamStrength(hSample, hDecay);
+  const aStr = xgTeamStrength(aSample, aDecay);
+
+  // CONDITIONAL ACTIVATION: require at least one side to have xG or SOT
+  const anyData = hStr.hasXg || hStr.hasSot || aStr.hasXg || aStr.hasSot;
+  if (!anyData) return null;
+
+  const hS = hStr.strength;
+  const aS = aStr.strength;
+  const totalS = hS + aS;
+
+  // Guard against zero/non-finite totals
+  if (!isFinite(totalS) || totalS <= 0.001) return null;
+
+  // Raw home/away split from attacking strength ratio
+  const DRAW_BASELINE = 0.20;
+  const remaining     = 1.0 - DRAW_BASELINE;  // 0.80 split between H/A
+
+  const homeRaw = (hS / totalS) * remaining;
+  const awayRaw = (aS / totalS) * remaining;
+
+  // Clamp and normalise to [0.02, 0.92]
+  const clampP = v => Math.max(0.02, Math.min(0.92, v));
+  const hw  = clampP(homeRaw);
+  const aw  = clampP(awayRaw);
+  const dr  = clampP(1 - hw - aw);
+  const sum = hw + dr + aw;
+
+  if (!isFinite(sum) || sum <= 0) return null;
+
+  return {
+    homeWin: +(hw  / sum).toFixed(4),
+    draw:    +(dr  / sum).toFixed(4),
+    awayWin: +(aw  / sum).toFixed(4)
+  };
+}
+
+// -- Safe weight for xgSot in the ensemble ---------------------------
+// Kept deliberately low to avoid double-counting with  -derived signals.
+const XG_SOT_ENSEMBLE_WEIGHT = 0.07;  // 7%   safely below 10% ceiling
 
 /**
  * Ensemble BTTS fusion.
@@ -2706,37 +2593,75 @@ function fuseBTTS(poissonBTTS, formBTTS, w) {
  * Ensemble 1X2 outcome probabilities.
  * Elo provides calibrated 1X2; Form provides adjustment multiplier.
  * Poisson does not provide 1X2 directly; we rely on Elo for this.
+ *
+ * xgSotProbs (optional): Output of xgSotModel(). When non-null, blended in
+ * at XG_SOT_ENSEMBLE_WEIGHT ( 0.08) to avoid double-counting   signals.
+ * When null: function behaves IDENTICALLY to the original implementation.
+ *
+ * @param {Object}      eloProbs   - Elo 1X2 probabilities
+ * @param {Object}      formStats  - Form trend stats
+ * @param {Object}      w          - Weights object
+ * @param {Object|null} xgSotProbs - Optional xgSotModel() output
  */
-function fuseOutcomes(eloProbs, formStats, w) {
+function fuseOutcomes(eloProbs, formStats, w, xgSotProbs = null) {
   if (!eloProbs) return null;
 
   // Form slope adjusts home win probability slightly
-  // Bound slope influence to ±15% of base probability
+  // Bound slope influence to  15% of base probability
   const slopeAdj = Math.max(-0.10, Math.min(0.10, (formStats?.slope || 0) * 0.12));
   const formMult = 1 + w.wForm * slopeAdj;
 
-  const hw = eloProbs.homeWin * formMult;
-  const aw = eloProbs.awayWin;
-  const dr = Math.max(0.05, 1 - hw - aw);
-  const total = hw + dr + aw;
+  const hw0 = eloProbs.homeWin * formMult;
+  const aw0 = eloProbs.awayWin;
+  const dr0 = Math.max(0.05, 1 - hw0 - aw0);
+  const tot0 = hw0 + dr0 + aw0;
 
   // Guard against NaN/Infinity before division
-  if (!isFinite(total) || total <= 0) {
+  if (!isFinite(tot0) || tot0 <= 0) {
     return { hw: eloProbs.homeWin, draw: eloProbs.draw, aw: eloProbs.awayWin };
   }
 
+  // Base Elo+Form probabilities (normalised)
+  let hw   = Math.max(0.02, Math.min(0.92, hw0 / tot0));
+  let draw = Math.max(0.05, Math.min(0.92, dr0 / tot0));
+  let aw   = Math.max(0.02, Math.min(0.92, aw0 / tot0));
+
+  // -- SAFE xG/SOT blend   only when available, low weight ----------
+  // Validate xgSotProbs before using   all three fields must be finite
+  if (
+    xgSotProbs !== null &&
+    isFinite(xgSotProbs.homeWin) && xgSotProbs.homeWin > 0 &&
+    isFinite(xgSotProbs.draw)    && xgSotProbs.draw    > 0 &&
+    isFinite(xgSotProbs.awayWin) && xgSotProbs.awayWin > 0
+  ) {
+    const wX  = XG_SOT_ENSEMBLE_WEIGHT;   // e.g. 0.07
+    const wB  = 1.0 - wX;                 // 0.93   base keeps majority weight
+    hw   = wB * hw   + wX * xgSotProbs.homeWin;
+    draw = wB * draw + wX * xgSotProbs.draw;
+    aw   = wB * aw   + wX * xgSotProbs.awayWin;
+
+    // Re-normalise after blend (floating point safety)
+    const blendSum = hw + draw + aw;
+    if (isFinite(blendSum) && blendSum > 0) {
+      hw   = hw   / blendSum;
+      draw = draw / blendSum;
+      aw   = aw   / blendSum;
+    }
+  }
+  // -----------------------------------------------------------------
+
   return {
-    hw:   Math.max(0.02, Math.min(0.92, hw   / total)),
-    draw: Math.max(0.05, Math.min(0.92, dr   / total)),
-    aw:   Math.max(0.02, Math.min(0.92, aw   / total))
+    hw:   Math.max(0.02, Math.min(0.92, hw)),
+    draw: Math.max(0.05, Math.min(0.92, draw)),
+    aw:   Math.max(0.02, Math.min(0.92, aw))
   };
 }
 
-// ═══════════════════════════════════════════════════════════════════════
-// ── MODEL CONFIDENCE SCORING ──────────────────────────────────────────
-// Scores prediction reliability 0–1, independent of prediction value.
+// =======================================================================
+// -- MODEL CONFIDENCE SCORING ------------------------------------------
+// Scores prediction reliability 0 1, independent of prediction value.
 // Inputs: data quality, model agreement, signal strength, stability.
-// ═══════════════════════════════════════════════════════════════════════
+// =======================================================================
 
 /**
  * Confidence score for a fixture prediction.
@@ -2745,27 +2670,27 @@ function fuseOutcomes(eloProbs, formStats, w) {
 function calcConfidence(H, A, poissonBTTS, ensBTTS, eloProbs, formH, formA, cw) {
   if (!H.found || !A.found) return { score: 0, label: 'LOW', components: {} };
 
-  // A) Data quality — sample size, both teams found, N adequacy
+  // A) Data quality   sample size, both teams found, N adequacy
   const minN = Math.min(H.N || 0, A.N || 0);
   const sampleQ = Math.min(1, minN / 15);   // saturates at 15 matches
   const foundBonus = (H.found && A.found) ? 1 : 0.3;
   const dataQuality = sampleQ * foundBonus;
 
-  // B) Model agreement — how close are Poisson and Form BTTS estimates?
+  // B) Model agreement   how close are Poisson and Form BTTS estimates?
   // NOTE: Elo is excluded from BTTS agreement (Elo is W/D/L only by design)
   const poisV = (poissonBTTS !== null && isFinite(poissonBTTS)) ? poissonBTTS : 0.5;
   const formV = formH ? (formH.bttsFactor + formA.bttsFactor) / 2 : 0.5;
   const vals  = [poisV, formV];
   const meanV = vals.reduce((s,v)=>s+v,0)/vals.length;
   const spread = Math.sqrt(vals.reduce((s,v)=>s+(v-meanV)**2,0)/vals.length);
-  // spread of 0.20 → 0 confidence; scaled to be realistic for 2-model agreement
+  // spread of 0.20   0 confidence; scaled to be realistic for 2-model agreement
   const modelAgreement = Math.max(0, 1 - spread * 5);
 
-  // C) Signal strength — distance from 50% neutrality
+  // C) Signal strength   distance from 50% neutrality
   const signal = ensBTTS !== null ? ensBTTS : poissonBTTS || 0.5;
-  const signalStrength = Math.min(1, Math.abs(signal - 0.5) * 3);  // 0.67 away from 0.5 → 1.0
+  const signalStrength = Math.min(1, Math.abs(signal - 0.5) * 3);  // 0.67 away from 0.5   1.0
 
-  // D) Stability — low volatility in both teams = more stable prediction
+  // D) Stability   low volatility in both teams = more stable prediction
   const voltH = formH ? Math.min(1, formH.volatility / 3) : 0.5;
   const voltA = formA ? Math.min(1, formA.volatility / 3) : 0.5;
   const stability = 1 - (voltH + voltA) / 2;
@@ -2791,9 +2716,9 @@ function calcConfidence(H, A, poissonBTTS, ensBTTS, eloProbs, formH, formA, cw) 
   };
 }
 
-// ═══════════════════════════════════════════════════════════════════════
+// =======================================================================
 // UI helpers for weight sliders
-// ═══════════════════════════════════════════════════════════════════════
+// =======================================================================
 
 function onWeightChange() {
   const p = parseInt(document.getElementById('wPoisson').value);
@@ -2805,7 +2730,7 @@ function onWeightChange() {
   document.getElementById('wEloVal').textContent     = (e/100).toFixed(2);
   document.getElementById('wFormVal').textContent    = (f/100).toFixed(2);
   const sumEl = document.getElementById('wSumLabel');
-  sumEl.textContent = `Σ = ${sum} ${total===100?'✓':'⚠ not 1.0'}`;
+  sumEl.textContent = `  = ${sum} ${total===100?' ':'  not 1.0'}`;
   sumEl.className   = 'wsl-sum ' + (total === 100 ? 'ok' : 'err');
   // update conf weight displays
   ['cAlpha','cBeta','cGamma','cDelta'].forEach(id => {
@@ -2826,202 +2751,9 @@ function setEnsMode(m) {
   if (typeof applyFilters === 'function' && allRows.length) applyFilters();
 }
 
-// ── mode toggle state ──
+// -- mode toggle state --
 let osiMode='raw'; // 'raw' | 'adj' | 'both'
 let _leagueOSIs=[];  // populated on each Run
-
-// ═══════════════════════════════════════════════════════════════════════
-// ── xG / SOT INTENT SIGNAL ENGINE ─────────────────────────────────────
-//
-// Adds a tiny multiplicative adjustment to base λ values:
-//   - xG (if available): primary attacking intent signal, weight ε_xg
-//   - SOT (always present when data has it): minor aggression signal, ε_sot
-//
-// DESIGN CONSTRAINTS:
-//   • Goals remain the dominant factor in λ — these are low-weight nudges
-//   • All multipliers are clamped ∈ [0.90, 1.10] before application
-//   • Final combined adjustment kept within ≈ ±5% of base λ
-//   • If xG missing → xG signal = 1.0 (no contribution)
-//   • If both missing → multiplier = 1.0 (exact original model behaviour)
-// ═══════════════════════════════════════════════════════════════════════
-
-/** Tuning constants — small by design to avoid model volatility */
-const INTENT_CFG = {
-  epsilon_xg:  0.07,  // weight of xG signal (range 0.05–0.10)
-  epsilon_sot: 0.03,  // weight of SOT signal (range 0.02–0.04)
-  xg_scale:    0.30,  // compress xG ratio toward 1.0
-  sot_scale:   0.20,  // compress SOT ratio toward 1.0 (smaller = more conservative)
-  clamp_lo:    0.90,  // lower bound for any single signal
-  clamp_hi:    1.10,  // upper bound for any single signal
-  mult_lo:     0.95,  // final multiplier floor  (≈ −5% max reduction)
-  mult_hi:     1.05,  // final multiplier ceiling (≈ +5% max boost)
-};
-
-/**
- * Safe ratio helper: value / average, returns 1.0 when average is 0/null/NaN.
- */
-function _safeRatio(value, avg) {
-  if (!isFinite(avg) || avg <= 0) return 1.0;
-  if (!isFinite(value) || value < 0) return 1.0;
-  return value / avg;
-}
-
-/**
- * Compress a raw ratio toward 1.0 using a scale factor, then clamp.
- * compressed = 1 + scale × (ratio − 1)
- * This prevents extreme ratios from creating large multipliers.
- */
-function _compressSignal(ratio, scale) {
-  const compressed = 1 + scale * (ratio - 1);
-  return Math.max(INTENT_CFG.clamp_lo, Math.min(INTENT_CFG.clamp_hi, compressed));
-}
-
-/**
- * Compute the attack-intent multiplier for a team's last N matches.
- *
- * @param {string} teamName   - canonical team name
- * @param {number} n          - sample size
- * @param {number} alpha      - decay weight exponent
- * @param {object} leagueAvgs - { avgXg, avgSot } from _leagueParams for this team's league
- * @returns {{ multiplier, xgSignal, sotSignal, hasXg, hasSot }}
- */
-function computeIntentMultiplier(teamName, n, alpha, leagueAvgs) {
-  const cfg = INTENT_CFG;
-  const all = getTeamMatches(teamName);
-
-  // Default: no adjustment
-  const neutral = { multiplier: 1.0, xgSignal: 1.0, sotSignal: 1.0, hasXg: false, hasSot: false };
-
-  if (!all.length) return neutral;
-  const sample = all.slice(-n);
-  const N = sample.length;
-  if (!N) return neutral;
-  const dw = decayWeights(N, alpha);
-
-  // ── Weighted averages of xG and SOT ──
-  let sumXg = 0, xgCount = 0;
-  let sumSot = 0, sotCount = 0;
-  for (let i = 0; i < N; i++) {
-    const m = sample[i], w = dw[i];
-    if (m.xg !== null && m.xg !== undefined && isFinite(m.xg)) { sumXg  += m.xg  * w; xgCount++; }
-    if (m.sot !== null && m.sot !== undefined && isFinite(m.sot)) { sumSot += m.sot * w; sotCount++; }
-  }
-  const hasXg  = xgCount  > 0;
-  const hasSot = sotCount > 0;
-
-  // ── Compute per-signal ratios ──
-  const avgXg  = leagueAvgs?.avgXg  || null;
-  const avgSot = leagueAvgs?.avgSot || null;
-
-  // xG signal: use if both team data and league average are available
-  let xgSignal = 1.0;
-  if (hasXg && avgXg !== null && avgXg > 0) {
-    const teamXg = sumXg; // already decay-weighted average
-    xgSignal = _compressSignal(_safeRatio(teamXg, avgXg), cfg.xg_scale);
-  }
-
-  // SOT signal: use if both team data and league average are available
-  let sotSignal = 1.0;
-  if (hasSot && avgSot !== null && avgSot > 0) {
-    const teamSot = sumSot;
-    sotSignal = _compressSignal(_safeRatio(teamSot, avgSot), cfg.sot_scale);
-  }
-
-  // ── Combine signals with very small epsilon weights ──
-  // intent_multiplier = 1 + ε_xg*(xgSig−1) + ε_sot*(sotSig−1)
-  const raw = 1
-    + cfg.epsilon_xg  * (xgSignal  - 1)
-    + cfg.epsilon_sot * (sotSignal - 1);
-
-  // Final clamp: ≈ ±5% max total adjustment
-  const multiplier = Math.max(cfg.mult_lo, Math.min(cfg.mult_hi, raw));
-
-  return {
-    multiplier: +multiplier.toFixed(5),
-    xgSignal:   +xgSignal.toFixed(4),
-    sotSignal:  +sotSignal.toFixed(4),
-    hasXg, hasSot
-  };
-}
-
-/**
- * Mirror of computeIntentMultiplier using defensive signals (xGA, SOT_faced).
- * Used to compute defense_multiplier that adjusts the OPPONENT's scoring rate.
- */
-function computeDefenseMultiplier(teamName, n, alpha, leagueAvgs) {
-  const cfg = INTENT_CFG;
-  const all = getTeamMatches(teamName);
-
-  const neutral = { multiplier: 1.0, xgaSignal: 1.0, sotFacedSignal: 1.0, hasXga: false, hasSotFaced: false };
-
-  if (!all.length) return neutral;
-  const sample = all.slice(-n);
-  const N = sample.length;
-  if (!N) return neutral;
-  const dw = decayWeights(N, alpha);
-
-  let sumXga = 0, xgaCount = 0;
-  let sumSotF = 0, sotFCount = 0;
-  for (let i = 0; i < N; i++) {
-    const m = sample[i], w = dw[i];
-    if (m.xga !== null && m.xga !== undefined && isFinite(m.xga)) { sumXga  += m.xga  * w; xgaCount++; }
-    if (m.sot_faced !== null && m.sot_faced !== undefined && isFinite(m.sot_faced)) { sumSotF += m.sot_faced * w; sotFCount++; }
-  }
-  const hasXga     = xgaCount  > 0;
-  const hasSotFaced = sotFCount > 0;
-
-  const avgXg  = leagueAvgs?.avgXg  || null;
-  const avgSot = leagueAvgs?.avgSot || null;
-
-  // xGA signal: high xGA conceded → higher opponent scoring intent → multiplier > 1
-  let xgaSignal = 1.0;
-  if (hasXga && avgXg !== null && avgXg > 0) {
-    xgaSignal = _compressSignal(_safeRatio(sumXga, avgXg), cfg.xg_scale);
-  }
-
-  // SOT_faced signal: more shots faced → slightly more permissive defence
-  let sotFacedSignal = 1.0;
-  if (hasSotFaced && avgSot !== null && avgSot > 0) {
-    sotFacedSignal = _compressSignal(_safeRatio(sumSotF, avgSot), cfg.sot_scale);
-  }
-
-  const raw = 1
-    + cfg.epsilon_xg  * (xgaSignal      - 1)
-    + cfg.epsilon_sot * (sotFacedSignal  - 1);
-
-  const multiplier = Math.max(cfg.mult_lo, Math.min(cfg.mult_hi, raw));
-
-  return {
-    multiplier:     +multiplier.toFixed(5),
-    xgaSignal:      +xgaSignal.toFixed(4),
-    sotFacedSignal: +sotFacedSignal.toFixed(4),
-    hasXga, hasSotFaced
-  };
-}
-
-/**
- * Resolve the league-level xG/SOT averages for a given team key.
- * Reuses the same league-detection logic as buildTeamRatings.
- */
-function _leagueAvgsForTeam(teamKey) {
-  const ct = {};
-  for (const [sh, rows] of Object.entries(histSheets)) {
-    if (!rows.length) continue;
-    const c = getCols(rows, C_HOME, C_AWAY, null, null);
-    if (!c || !c.home || !c.away) continue;
-    let count = 0;
-    for (const r of rows) {
-      const h = String(r[c.home]||'').toLowerCase().trim();
-      const a = String(r[c.away]||'').toLowerCase().trim();
-      if (h === teamKey || a === teamKey) count++;
-    }
-    if (count > 0) ct[divName(sh)] = (ct[divName(sh)]||0) + count;
-  }
-  const topLeague = Object.entries(ct).sort((a,b) => b[1]-a[1])[0];
-  if (!topLeague) return { avgXg: null, avgSot: null };
-  const lp = _leagueParams[topLeague[0]];
-  return lp ? { avgXg: lp.avgXg || null, avgSot: lp.avgSot || null } : { avgXg: null, avgSot: null };
-}
 
 function teamStats(name,n,alpha=1.0){
   const all=getTeamMatches(name);
@@ -3030,36 +2762,36 @@ function teamStats(name,n,alpha=1.0){
   const N=sample.length;
   const dw=decayWeights(N,alpha); // normalised weights, most recent = highest
 
-  // ── raw λ — index-decay-weighted (kept for OSI/adj pipeline) ──
+  // -- raw     index-decay-weighted (kept for OSI/adj pipeline) --
   const lS_raw=sample.reduce((s,m,i)=>s+m.scored  *dw[i],0);
   const lC_raw=sample.reduce((s,m,i)=>s+m.conceded*dw[i],0);
   // totS/totC kept as raw counts for display purposes
   const totS=sample.reduce((s,m)=>s+m.scored,0);
   const totC=sample.reduce((s,m)=>s+m.conceded,0);
 
-  // ── OSI-adjusted λ (one-stage opponent-strength) with decay ──
+  // -- OSI-adjusted   (one-stage opponent-strength) with decay --
   const adjL=adjustedTeamLambda(name,n,_leagueOSIs,alpha);
   const lS_adj=adjL.scored, lC_adj=adjL.conceded;
 
-  // ── time-frequency-adjusted λ (fatigue + rest) ──
+  // -- time-frequency-adjusted   (fatigue + rest) --
   const freqL = computeAdjustedLambda(name, n);
   const lS_freq = freqL.scored;
   const lC_freq = freqL.conceded;
 
-  // ── pick active λ based on mode ──
+  // -- pick active   based on mode --
   // In 'raw' mode: use freq-adjusted (time-aware but no OSI)
   // In 'adj' mode: blend freq + OSI adjustments
   // In 'both' mode: show raw alongside OSI-adj (freq always applied to raw)
   const lS = osiMode==='raw'  ? lS_freq
            : osiMode==='adj'  ? Math.min(FREQ_CONFIG.lambdaMax, Math.max(FREQ_CONFIG.lambdaMin,
                (lS_adj * freqL.fatigueFactor * freqL.restBoost)))
-           : lS_raw; // 'both' — raw column stays as index-decay only for comparison
+           : lS_raw; // 'both'   raw column stays as index-decay only for comparison
   const lC = osiMode==='raw'  ? lC_freq
            : osiMode==='adj'  ? Math.min(FREQ_CONFIG.lambdaMax, Math.max(FREQ_CONFIG.lambdaMin,
                (lC_adj / freqL.fatigueFactor)))
            : lC_raw;
 
-  // Individual team BTTS (marginal — how often does THIS team score AND concede?)
+  // Individual team BTTS (marginal   how often does THIS team score AND concede?)
   // Use DC-corrected formula: assumes symmetric opponent with same lambda
   const btts = dcBTTS(lS, lC, -0.13);
   const cs=sample.filter(m=>m.conceded===0).length;
@@ -3067,15 +2799,10 @@ function teamStats(name,n,alpha=1.0){
   const usedStart=all.length-n;
   const raw=all.map((m,i)=>({...m,used:i>=usedStart}));
 
-  // ── attack/defence ratings (DC model) ──
+  // -- attack/defence ratings (DC model) --
   const canon=fuzzy(name,masterIdx);
   const teamKey=canon?canon.toLowerCase():null;
   const dcRating=teamKey&&_teamRatings[teamKey]?_teamRatings[teamKey]:null;
-
-  // ── xG / SOT intent signals (small multiplicative nudge only) ──
-  const leagueAvgs = teamKey ? _leagueAvgsForTeam(teamKey) : { avgXg: null, avgSot: null };
-  const intentSig  = computeIntentMultiplier(name, n, alpha, leagueAvgs);
-  const defenseSig = computeDefenseMultiplier(name, n, alpha, leagueAvgs);
 
   return{
     name,found:true,N,totS,totC,cs,fts,
@@ -3094,17 +2821,6 @@ function teamStats(name,n,alpha=1.0){
     attackRating:  dcRating?dcRating.attackRating:null,
     defenceRating: dcRating?dcRating.defenceRating:null,
     osiMode,
-    // xG / SOT intent signals — stored for use in calcFixture and drawer display
-    intentMultiplier:  intentSig.multiplier,
-    defenseMultiplier: defenseSig.multiplier,
-    xgSignal:          intentSig.xgSignal,
-    sotSignal:         intentSig.sotSignal,
-    xgaSignal:         defenseSig.xgaSignal,
-    sotFacedSignal:    defenseSig.sotFacedSignal,
-    hasXg:             intentSig.hasXg,
-    hasSot:            intentSig.hasSot,
-    hasXga:            defenseSig.hasXga,
-    hasSotFaced:       defenseSig.hasSotFaced,
     btts:+btts.toFixed(4),low:N<10,rawMatches:raw
   };
 }
@@ -3123,39 +2839,16 @@ function calcForm(t,mx){return+((Math.min(1,t.lS/mx)*.60+(t.cs/t.N)*.40)*100).to
 function calcFixture(league,home,away,n,alpha=1.0,meta={}){
   const H=teamStats(home,n,alpha),A=teamStats(away,n,alpha);
 
-  // ── Dixon-Coles λ (attack/defence + home advantage) ──
+  // -- Dixon-Coles   (attack/defence + home advantage) --
   const homeKey=fuzzy(home,masterIdx); const awayKey=fuzzy(away,masterIdx);
   const dcL=(H.found&&A.found&&homeKey&&awayKey)
     ? dcLambda(homeKey.toLowerCase(), awayKey.toLowerCase(), league)
     : null;
 
-  // If DC model available, use its λ as the primary scoring rate
+  // If DC model available, use its   as the primary scoring rate
   // otherwise fall back to time-frequency-adjusted teamStats lS
-  const hLamDC_base = dcL ? dcL.lambdaHome : (H.found ? H.lS : null);
-  const aLamDC_base = dcL ? dcL.lambdaAway : (A.found ? A.lS : null);
-
-  // ── xG / SOT intent adjustment (STEP 7) ──────────────────────────────
-  // Apply AFTER the existing λ is computed — goals remain the dominant factor.
-  //
-  // λ_home_final = λ_home_base × intentHome × defenseAway
-  // λ_away_final = λ_away_base × intentAway × defenseHome
-  //
-  // intentHome  = home team's attack intent multiplier (xG + SOT nudge)
-  // defenseAway = away team's defensive permissiveness (xGA + SOT_faced nudge)
-  //
-  // If neither team has xG or SOT data → both multipliers = 1.0 → exact original λ.
-  // ─────────────────────────────────────────────────────────────────────
-  const intentHome  = H.found ? (H.intentMultiplier  || 1.0) : 1.0;
-  const defenseAway = A.found ? (A.defenseMultiplier || 1.0) : 1.0;
-  const intentAway  = A.found ? (A.intentMultiplier  || 1.0) : 1.0;
-  const defenseHome = H.found ? (H.defenseMultiplier || 1.0) : 1.0;
-
-  const hLamDC = hLamDC_base !== null
-    ? +Math.max(0.3, Math.min(4.0, hLamDC_base * intentHome * defenseAway)).toFixed(4)
-    : null;
-  const aLamDC = aLamDC_base !== null
-    ? +Math.max(0.3, Math.min(4.0, aLamDC_base * intentAway * defenseHome)).toFixed(4)
-    : null;
+  const hLamDC = dcL ? dcL.lambdaHome : (H.found ? H.lS : null);
+  const aLamDC = dcL ? dcL.lambdaAway : (A.found ? A.lS : null);
 
   // Estimate rho from combined match history for this fixture
   // Merges home+away records for a league-level rho estimate
@@ -3165,8 +2858,8 @@ function calcFixture(league,home,away,n,alpha=1.0,meta={}){
   ];
   const rho = estimateRho(allMatchesForRho);
 
-  // ── BTTS: correlation-aware Dixon-Coles rho correction ──
-  // Replaces independent Poisson formula (1-e^-λH)(1-e^-λA)
+  // -- BTTS: correlation-aware Dixon-Coles rho correction --
+  // Replaces independent Poisson formula (1-e^- H)(1-e^- A)
   // with the mathematically correct joint probability accounting for
   // low-score dependence (0-0, 0-1, 1-0, 1-1 cells corrected by rho).
   const mBTTS = (hLamDC !== null && aLamDC !== null)
@@ -3181,35 +2874,55 @@ function calcFixture(league,home,away,n,alpha=1.0,meta={}){
     ? dcBTTS(H.lS_adj, A.lS_adj, rho)
     : null;
 
-  // ── Elo model — W/D/L probabilities only ──
-  // Elo does NOT contribute to BTTS (by design — see eloMatchProb())
+  // -- Elo model   W/D/L probabilities only --
+  // Elo does NOT contribute to BTTS (by design   see eloMatchProb())
   const eloProbs = (homeKey && awayKey)
     ? eloMatchProb(homeKey.toLowerCase(), awayKey.toLowerCase())
     : null;
 
-  // ── Form regression model ──
+  // -- Form regression model --
   const formH = formTrendStats(home, n, alpha);
   const formA = formTrendStats(away, n, alpha);
 
-  // ── Ensemble fusion ──
+  // -- Ensemble fusion --
   const w   = getWeights();
   const cw  = getConfWeights();
 
-  // BTTS ensemble: Poisson (DC-corrected) + Form only — NO Elo
+  // BTTS ensemble: Poisson (DC-corrected) + Form only   NO Elo
   const formBTTS = (formH.bttsFactor + formA.bttsFactor) / 2;
   const ensBTTS = (H.found && A.found && mBTTS !== null)
     ? fuseBTTS(mBTTS, formBTTS, w)
     : mBTTS;
 
-  // 1X2 outcomes: Elo primary, Form adjustment — NO Poisson for outcomes
+  // -- xG / SOT supplementary model (STEP 2-3) ----------------------
+  // Runs ONLY when reliable xG or SOT data exists for at least one team.
+  // Uses the same decay weights already computed inside teamStats().
+  // Returns null when data absent   ensemble unchanged (backward compat).
+  let xgSotProbs = null;
+  if (H.found && A.found) {
+    const hKey = homeKey ? homeKey.toLowerCase() : null;
+    const aKey = awayKey ? awayKey.toLowerCase() : null;
+    const hMatches = hKey ? (matchStore[hKey] || []) : [];
+    const aMatches = aKey ? (matchStore[aKey] || []) : [];
+    const hSample  = hMatches.slice(-n);
+    const aSample  = aMatches.slice(-n);
+    if (hSample.length && aSample.length) {
+      const hDecay = decayWeights(hSample.length, alpha);
+      const aDecay = decayWeights(aSample.length, alpha);
+      xgSotProbs = xgSotModel(hSample, aSample, hDecay, aDecay);
+    }
+  }
+
+  // 1X2 outcomes: Elo primary, Form adjustment, optional xG/SOT blend
+  // When xgSotProbs is null   fuseOutcomes behaves identically to before.
   const ensOutcomes = (H.found && A.found && eloProbs)
-    ? fuseOutcomes(eloProbs, formH, w)
+    ? fuseOutcomes(eloProbs, formH, w, xgSotProbs)
     : null;
 
-  // ── Confidence ──
+  // -- Confidence --
   const conf = calcConfidence(H, A, mBTTS, ensBTTS, eloProbs, formH, formA, cw);
 
-  // ── Conservative O/U Filter — use intent-adjusted DC λ for better accuracy ──
+  // -- Conservative O/U Filter   use DC   when available for better accuracy --
   const lambdaTotal = (hLamDC!==null&&aLamDC!==null) ? +(hLamDC + aLamDC).toFixed(4)
                     : (H.found && A.found) ? +(H.lS + A.lS).toFixed(4) : null;
   const conservOU   = lambdaTotal !== null ? calcConservativeOU(lambdaTotal) : { under15: 0, over35: 0 };
@@ -3227,19 +2940,9 @@ function calcFixture(league,home,away,n,alpha=1.0,meta={}){
     mBTTS_raw: mBTTS_raw !== null ? +mBTTS_raw.toFixed(4) : null,
     mBTTS_adj: mBTTS_adj !== null ? +mBTTS_adj.toFixed(4) : null,
     rho: +rho.toFixed(4),
-    // dcLambdas now reflects intent-adjusted values; store base for transparency
-    dcLambdas: dcL ? {
-      ...dcL,
-      lambdaHome: hLamDC,
-      lambdaAway: aLamDC,
-      lambdaHomeBase: hLamDC_base,
-      lambdaAwayBase: aLamDC_base,
-      intentHome:  +intentHome.toFixed(4),
-      defenseAway: +defenseAway.toFixed(4),
-      intentAway:  +intentAway.toFixed(4),
-      defenseHome: +defenseHome.toFixed(4)
-    } : null,
+    dcLambdas: dcL,           // { lambdaHome, lambdaAway, homeAdvFactor, leagueAvg } or null
     eloProbs, formH, formA,
+    xgSotProbs,                // { homeWin, draw, awayWin } or null   xG/SOT model output
     ensBTTS: ensBTTS !== null ? +ensBTTS.toFixed(4) : null,
     ensOutcomes,
     conf,
@@ -3250,9 +2953,9 @@ function calcFixture(league,home,away,n,alpha=1.0,meta={}){
   };
 }
 
-// ═══════════════════════════════════════════════
+// ===============================================
 // FILE PARSING
-// ═══════════════════════════════════════════════
+// ===============================================
 function parseFile(f){
   return new Promise((res,rej)=>{
     const r=new FileReader();
@@ -3261,12 +2964,10 @@ function parseFile(f){
   });
 }
 
-// FILE A — multiple
+// FILE A   multiple
 function rebuildIndex(){
   masterIdx=buildMasterIndex(histSheets);
   matchStore=buildMatchStore(histSheets,masterIdx);
-  // Rebuild merged dataset every time new data is loaded
-  buildMergedDataset();
   document.getElementById('ts-files').textContent=loadedFiles.length;
   document.getElementById('ts-teams').textContent=Object.keys(masterIdx).length;
   checkReady();
@@ -3285,7 +2986,7 @@ function renderFileList(){
       const sheetCount=Object.keys(histSheets).filter(k=>k.startsWith(name+'::')).length;
       const el=document.createElement('div');
       el.className='file-item';
-      el.innerHTML=`<span class="file-item-name" title="${name}">${name.replace(/\.xlsx?$/,'')}</span><span class="file-item-sheets">${sheetCount}sh</span><button class="file-item-del" data-idx="${i}" title="Remove">✕</button>`;
+      el.innerHTML=`<span class="file-item-name" title="${name}">${name.replace(/\.xlsx?$/,'')}</span><span class="file-item-sheets">${sheetCount}sh</span><button class="file-item-del" data-idx="${i}" title="Remove"> </button>`;
       list.insertBefore(el,null);
     });
     list.querySelectorAll('.file-item-del').forEach(btn=>{
@@ -3309,26 +3010,98 @@ document.getElementById('fileA').addEventListener('change',async e=>{
   e.target.value=''; // reset so same file can be re-added if needed
   if(loadedFiles.includes(f.name)){log(`Already loaded: ${f.name}`,'err');return;}
   try{
-    log(`Loading ${f.name}…`);
+    log(`Loading ${f.name} `);
     const sheets=await parseFile(f);
     for(const[sh,rows]of Object.entries(sheets))histSheets[`${f.name}::${sh}`]=rows;
     loadedFiles.push(f.name);
-    log(`✓ ${f.name} — ${Object.keys(sheets).length} sheet(s)`,'ok');
+    log(`  ${f.name}   ${Object.keys(sheets).length} sheet(s)`,'ok');
     rebuildIndex();
     renderFileList();
     log(`Index: ${Object.keys(masterIdx).length} teams across ${loadedFiles.length} file(s)`,'ok');
-  }catch(err){log(`✗ ${f.name}: ${err.message}`,'err');}
+  }catch(err){log(`  ${f.name}: ${err.message}`,'err');}
 });
 
-// FILE B — fixtures now loaded from Drive (loadFixturesFromDrive)
-// Manual upload removed; fixSheets is set by loadFixturesFromDrive()
+// FILE B   fixtures from Drive OR manual upload
+// fixSheets is set by loadFixturesFromDrive() OR handleFixtureFileUpload()
+
+/**
+ * Handle manual fixture file upload (CSV or XLSX).
+ * Parses the file using SheetJS (already loaded for history uploads),
+ * merges all sheets into fixSheets, and updates the UI exactly as
+ * loadFixturesFromDrive() does   so the rest of the engine is unaffected.
+ */
+async function handleFixtureFileUpload(input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+
+  const nameEl   = document.getElementById('fixUploadName');
+  const statusEl = document.getElementById('manualFixStatus');
+
+  const setStatus = (msg, type) => {
+    if (!statusEl) return;
+    statusEl.textContent = msg;
+    statusEl.className   = 'drive-status' + (type ? ' ' + type : '');
+  };
+
+  nameEl.textContent = file.name;
+  setStatus('Reading file ', 'loading');
+
+  try {
+    // Ensure SheetJS is available (it is loaded by the history section)
+    if (typeof XLSX === 'undefined') {
+      await loadScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
+    }
+
+    const buffer = await file.arrayBuffer();
+    const wb     = XLSX.read(buffer, { type: 'array' });
+
+    fixSheets = {};
+    let totalRows = 0;
+
+    for (const shName of wb.SheetNames) {
+      const ws   = wb.Sheets[shName];
+      const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+      if (rows.length) {
+        fixSheets[shName] = rows;
+        totalRows += rows.length;
+      }
+    }
+
+    if (!totalRows) {
+      setStatus('No rows found in file   check column headers.', 'err');
+      fixSheets = null;
+      checkReady();
+      return;
+    }
+
+    setStatus(`  ${totalRows} fixture${totalRows !== 1 ? 's' : ''} loaded from "${file.name}"`, 'ok');
+    log(`Manual fixtures: ${totalRows} rows loaded from ${Object.keys(fixSheets).length} sheet(s) in "${file.name}"`, 'ok');
+
+    // Sync the Drive fixtures card to reflect manual load
+    const stB    = document.getElementById('stB');
+    const cardB  = document.getElementById('cardB');
+    if (stB)    stB.textContent = `Manual   ${totalRows} fixtures   ${file.name}`;
+    if (cardB)  cardB.classList.add('active');
+
+    // Clear the Drive fixtures status so there's no conflicting message
+    const driveSt = document.getElementById('driveFixStatus');
+    if (driveSt) driveSt.textContent = '';
+
+    checkReady();
+  } catch (err) {
+    setStatus('Upload failed: ' + err.message, 'err');
+    log('Manual fixture upload error: ' + err.message, 'err');
+    fixSheets = null;
+    checkReady();
+  }
+}
 
 document.getElementById('nSlider').addEventListener('input',()=>
   document.getElementById('nVal').textContent=document.getElementById('nSlider').value);
 document.getElementById('decaySlider').addEventListener('input',()=>
   document.getElementById('decayVal').textContent=(parseInt(document.getElementById('decaySlider').value)/100).toFixed(2));
 
-// ── OSI Mode Toggle ──
+// -- OSI Mode Toggle --
 function setOsiMode(m){
   osiMode=m;
   ['raw','adj','both'].forEach(k=>{
@@ -3348,9 +3121,9 @@ function log(msg,type=''){
   logBar.appendChild(d);logBar.scrollTop=logBar.scrollHeight;
 }
 
-// ═══════════════════════════════════════════════
+// ===============================================
 // RUN
-// ═══════════════════════════════════════════════
+// ===============================================
 function setProgress(pct, label, count='') {
   // Sidebar bar
   document.getElementById('progressFill').style.width = pct + '%';
@@ -3365,59 +3138,53 @@ document.getElementById('runBtn').addEventListener('click',async()=>{
   const n=parseInt(document.getElementById('nSlider').value);
   const alpha=parseInt(document.getElementById('decaySlider').value)/100;
   const btn=document.getElementById('runBtn');
-  btn.disabled=true;btn.textContent='Running…';logBar.innerHTML='';logBar.classList.add('on');
+  btn.disabled=true;btn.textContent='Running ';logBar.innerHTML='';logBar.classList.add('on');
 
   // Show progress bar + fullscreen overlay
   const pw=document.getElementById('progressWrap');
   const lo=document.getElementById('loadOverlay');
   pw.classList.add('active');
   lo.classList.add('active');
-  setProgress(0,'Starting…');
+  setProgress(0,'Starting ');
   await new Promise(r=>setTimeout(r,0)); // let DOM paint
 
   try{
-    // Phase 1 — Season filter + OSI + frequency stats
-    setProgress(10,'Building league model…');
+    // Phase 1   Season filter + OSI + frequency stats
+    setProgress(10,'Building league model ');
     await new Promise(r=>setTimeout(r,0));
     const totalMatches = Object.values(matchStore).reduce((s,m)=>s+m.length,0);
     log(`Season filter: ${totalMatches} match records from ${SEASON_START.toDateString()} onwards`,'ok');
 
     // Build league match-frequency baseline (used by computeAdjustedLambda)
     _leagueFreqStats = computeLeagueFreqStats(matchStore);
-    log(`Frequency stats: avgDensity=${_leagueFreqStats.avgDensity.toFixed(4)} matches/day · avgRest=${_leagueFreqStats.avgRest.toFixed(1)} days`,'ok');
+    log(`Frequency stats: avgDensity=${_leagueFreqStats.avgDensity.toFixed(4)} matches/day   avgRest=${_leagueFreqStats.avgRest.toFixed(1)} days`,'ok');
 
     _leagueOSIs=buildLeagueOSIs(n,alpha);
-    log(`OSI mode: ${osiMode} · league OSI range: [${Math.min(..._leagueOSIs).toFixed(2)}, ${Math.max(..._leagueOSIs).toFixed(2)}] · recency α=${alpha.toFixed(2)}`,'ok');
+    log(`OSI mode: ${osiMode}   league OSI range: [${Math.min(..._leagueOSIs).toFixed(2)}, ${Math.max(..._leagueOSIs).toFixed(2)}]   recency  =${alpha.toFixed(2)}`,'ok');
 
-    // Phase 2 — Strength ratings
-    setProgress(25,'Computing attack/defence ratings…');
+    // Phase 2   Strength ratings
+    setProgress(25,'Computing attack/defence ratings ');
     await new Promise(r=>setTimeout(r,0));
     _leagueParams=buildLeagueParams(n,alpha);
     _teamRatings=buildTeamRatings(n,_leagueParams,alpha);
     const lpNames=Object.keys(_leagueParams);
-    log(`Strength model: ${Object.keys(_teamRatings).length} team ratings · ${lpNames.length} league(s) · home adv: ${lpNames.map(l=>l+' ×'+_leagueParams[l].homeAdvFactor.toFixed(3)).join(', ')}`,'ok');
-    // Report xG / SOT data availability
-    const xgLeagues  = lpNames.filter(l => _leagueParams[l].avgXg  !== null);
-    const sotLeagues = lpNames.filter(l => _leagueParams[l].avgSot !== null);
-    if (xgLeagues.length)  log(`xG data: ${xgLeagues.length} league(s) detected — intent signals active (ε=${INTENT_CFG.epsilon_xg})`,'ok');
-    if (sotLeagues.length) log(`SOT data: ${sotLeagues.length} league(s) detected — aggression signals active (ε=${INTENT_CFG.epsilon_sot})`,'ok');
-    if (!xgLeagues.length && !sotLeagues.length) log('No xG/SOT columns found — intent signals inactive (goals-only mode, backward compatible)','ok');
+    log(`Strength model: ${Object.keys(_teamRatings).length} team ratings   ${lpNames.length} league(s)   home adv: ${lpNames.map(l=>l+'  '+_leagueParams[l].homeAdvFactor.toFixed(3)).join(', ')}`,'ok');
 
-    // Phase 3 — Elo
-    setProgress(40,'Building Elo ratings…');
+    // Phase 3   Elo
+    setProgress(40,'Building Elo ratings ');
     await new Promise(r=>setTimeout(r,0));
     _eloRatings=buildEloRatings();
-    log(`Elo ratings built · ${_eloRatings.size} teams · top: ${[..._eloRatings.entries()].sort((a,b)=>b[1]-a[1]).slice(0,3).map(([k,v])=>k+':'+Math.round(v)).join(', ')}`,'ok');
+    log(`Elo ratings built   ${_eloRatings.size} teams   top: ${[..._eloRatings.entries()].sort((a,b)=>b[1]-a[1]).slice(0,3).map(([k,v])=>k+':'+Math.round(v)).join(', ')}`,'ok');
 
-    // Phase 4 — Fixture analysis (largest phase, track per-fixture)
-    setProgress(55,'Analysing fixtures…');
+    // Phase 4   Fixture analysis (largest phase, track per-fixture)
+    setProgress(55,'Analysing fixtures ');
     await new Promise(r=>setTimeout(r,0));
     const results=[];
     const allValid=[];
     for(const[sh,rows]of Object.entries(fixSheets)){
       if(!rows.length)continue;
       const c=getCols(rows,C_HOME,C_AWAY,null,null);
-      if(!c||!c.home||!c.away){log(`✗ No home/away cols in "${sh}"`,'err');continue;}
+      if(!c||!c.home||!c.away){log(`  No home/away cols in "${sh}"`,'err');continue;}
       const valid=rows.filter(r=>{const h=String(r[c.home]||'').trim(),a=String(r[c.away]||'').trim();return h&&h!=='undefined'&&a&&a!=='undefined';});
       log(`"${sh}": ${valid.length} fixture(s)`);
       // detect extra columns from Drive fixtures file
@@ -3444,16 +3211,16 @@ document.getElementById('runBtn').addEventListener('click',async()=>{
         const res=calcFixture(league,home,away,n,alpha,meta);
         results.push(res);
         const koLabel = kickoff ? ` @ ${kickoff.split(' ')[1]||kickoff}` : '';
-        log(`  ${res.H.found&&res.A.found?'✓':'⚠'} [${league}] ${home} vs ${away}${koLabel}`);
+        log(`  ${res.H.found&&res.A.found?' ':' '} [${league}] ${home} vs ${away}${koLabel}`);
         done++;
         const pct=55+Math.round((done/totalFix)*35);
-        setProgress(pct,`Analysing fixtures…`,`${done} of ${totalFix} complete`);
+        setProgress(pct,`Analysing fixtures `,`${done} of ${totalFix} complete`);
       }
       await new Promise(r=>setTimeout(r,0));
     }
 
-    // Phase 5 — Finalise
-    setProgress(92,'Finalising…');
+    // Phase 5   Finalise
+    setProgress(92,'Finalising ');
     await new Promise(r=>setTimeout(r,0));
     allRows=results;
     computeFormScores(allRows);
@@ -3461,7 +3228,7 @@ document.getElementById('runBtn').addEventListener('click',async()=>{
     document.getElementById('ts-fix').textContent=allRows.length;
     document.getElementById('ts-high').textContent=high;
     document.getElementById('ts-mode').textContent=(ensMode==='ensemble'?'ENSEMBLE':'POISSON')+' / '+osiMode.toUpperCase();
-    // Latest date across all loaded match data — capped at today
+    // Latest date across all loaded match data   capped at today
     const today = new Date();
     let latestDate = null;
     for (const matches of Object.values(matchStore)) {
@@ -3473,9 +3240,9 @@ document.getElementById('runBtn').addEventListener('click',async()=>{
     }
     document.getElementById('ts-date').textContent = latestDate
       ? latestDate.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})
-      : '—';
+      : ' ';
     document.getElementById('topStats').style.display='flex';
-    log(`✓ Done — ${allRows.length} fixture(s)`,'ok');
+    log(`  Done   ${allRows.length} fixture(s)`,'ok');
     fillLeagueSelect(allRows);
     document.getElementById('filterSection').style.display='flex';
     document.getElementById('emptyState').style.display='none';
@@ -3485,7 +3252,7 @@ document.getElementById('runBtn').addEventListener('click',async()=>{
     document.getElementById('gamesBtn').disabled=false;
     applyFilters();
 
-    setProgress(100,'Complete ✓','');
+    setProgress(100,'Complete  ','');
     setTimeout(()=>{
       pw.classList.remove('active');
       lo.classList.remove('active');
@@ -3493,18 +3260,18 @@ document.getElementById('runBtn').addEventListener('click',async()=>{
     }, 1200);
 
   }catch(err){
-    log(`✗ ${err.message}`,'err');
+    log(`  ${err.message}`,'err');
     console.error(err);
     setProgress(0,'');
     pw.classList.remove('active');
     lo.classList.remove('active');
   }
-  btn.textContent='▶ Run Analysis';btn.disabled=false;
+  btn.textContent='  Run Analysis';btn.disabled=false;
 });
 
-// ═══════════════════════════════════════════════
+// ===============================================
 // FILTERS
-// ═══════════════════════════════════════════════
+// ===============================================
 const F_IDS=['fLeague','fSearch','fQuality','fHlam','fHlamMax','fAlam','fAlamMax','fHcs','fAcs','fFormDiff','fMbtts','fMbttsMax','fConf','fConservSig'];
 
 function getF(){
@@ -3582,16 +3349,16 @@ function fillLeagueSelect(rows){
   ls.forEach(l=>{const o=document.createElement('option');o.value=l;o.textContent=l;sel.appendChild(o);});
 }
 
-// ═══════════════════════════════════════════════
+// ===============================================
 // COLOUR HELPERS
-// ═══════════════════════════════════════════════
+// ===============================================
 function bttsGrad(p){if(p>=70)return'linear-gradient(90deg,#00c48a,#00e5a0)';if(p>=50)return'linear-gradient(90deg,#e07b00,#ffd166)';return'linear-gradient(90deg,#c0162c,#ff4d6d)';}
 
-// ═══════════════════════════════════════════════
+// ===============================================
 // RENDER CARDS
-// ═══════════════════════════════════════════════
-function fmt2(v){return v==null?'—':Number(v).toFixed(2);}
-function fmtPct(v){return v==null?'—':(v*100).toFixed(1)+'%';}
+// ===============================================
+function fmt2(v){return v==null?' ':Number(v).toFixed(2);}
+function fmtPct(v){return v==null?' ':(v*100).toFixed(1)+'%';}
 function sparkbar(v,cls,max){
   if(v==null||max<=0)return'';
   const w=Math.min(100,(v/max)*100).toFixed(1);
@@ -3600,14 +3367,14 @@ function sparkbar(v,cls,max){
 function bttsClass(p){return p>=70?'btts-hi':p>=45?'btts-md':'btts-lo';}
 function scoreCol(v){return`hsl(${Math.round(v*1.2)},72%,58%)`;}
 function diffCell(v,dec=1){
-  if(v===null||v===undefined)return'<td class="tdz">—</td>';
+  if(v===null||v===undefined)return'<td class="tdz"> </td>';
   const s=dec===0?String(v):Number(v).toFixed(dec);
   const sign=v>0?'+':'';
   const cls=v>0?'tdp':v<0?'tdn':'tdz';
   return`<td class="${cls}">${sign}${s}</td>`;
 }
 function formCell(hF,aF,fd){
-  if(hF===null||aF===null)return'<td class="tdz" style="border-left:2px solid rgba(167,139,250,.2)">—</td>';
+  if(hF===null||aF===null)return'<td class="tdz" style="border-left:2px solid rgba(167,139,250,.2)"> </td>';
   const hc=scoreCol(hF),ac=scoreCol(aF);
   return`<td style="border-left:2px solid rgba(167,139,250,.2);white-space:nowrap;font-family:var(--mono);font-size:.68rem">
     <span style="color:${hc};font-weight:700">${hF.toFixed(1)}</span>
@@ -3619,28 +3386,28 @@ function formCell(hF,aF,fd){
 let sortKey='', sortDir=-1;
 
 
-// ── Ensemble BTTS cell for table ──
+// -- Ensemble BTTS cell for table --
 function ensBTTSCell(r) {
-  if (!r.ensBTTS && r.ensBTTS !== 0) return '<td class="ens-cell" style="border-left:2px solid rgba(0,229,160,.1)">—</td>';
-  const pois = r.mBTTS !== null ? (r.mBTTS*100).toFixed(1)+'%' : '—';
+  if (!r.ensBTTS && r.ensBTTS !== 0) return '<td class="ens-cell" style="border-left:2px solid rgba(0,229,160,.1)"> </td>';
+  const pois = r.mBTTS !== null ? (r.mBTTS*100).toFixed(1)+'%' : ' ';
   // NOTE: Elo no longer contributes to BTTS (Elo = W/D/L only)
-  const formF= r.formH && r.formA ? (((r.formH.bttsFactor+r.formA.bttsFactor)/2)*100).toFixed(1)+'%' : '—';
-  const rhoLabel = r.rho !== undefined ? `ρ=${r.rho.toFixed(2)}` : '';
+  const formF= r.formH && r.formA ? (((r.formH.bttsFactor+r.formA.bttsFactor)/2)*100).toFixed(1)+'%' : ' ';
+  const rhoLabel = r.rho !== undefined ? ` =${r.rho.toFixed(2)}` : '';
   const ens  = (r.ensBTTS*100).toFixed(1)+'%';
   return `<td class="ens-cell tb ${bttsClass(r.ensBTTS*100)}" style="border-left:2px solid rgba(0,229,160,.15)">
     <div class="ens-final">${ens}</div>
     <div style="display:flex;gap:4px;margin-top:2px">
       <span class="ens-pois" title="Poisson+DC">${pois}</span>
-      <span style="color:var(--t3)">·</span>
+      <span style="color:var(--t3)"> </span>
       <span class="ens-form-c" title="Form">${formF}</span>
       <span style="color:var(--t3);font-size:.48rem" title="Dixon-Coles rho">${rhoLabel}</span>
     </div>
   </td>`;
 }
 
-// ── Confidence cell for table ──
+// -- Confidence cell for table --
 function confCell(conf) {
-  if (!conf) return '<td>—</td>';
+  if (!conf) return '<td> </td>';
   const cls = conf.label==='HIGH' ? 'conf-hi' : conf.label==='MED' ? 'conf-md' : 'conf-lo';
   const fillColor = conf.label==='HIGH' ? '#00e5a0' : conf.label==='MED' ? '#ffd166' : '#ff4d6d';
   return `<td style="min-width:80px">
@@ -3657,8 +3424,8 @@ function conservCell(r) {
   const eL  = Math.exp(-r.lambdaTotal);
   const pLeq2 = eL * (1 + r.lambdaTotal + (r.lambdaTotal*r.lambdaTotal)/2);
   const over25pct = ((1 - pLeq2)*100).toFixed(1);
-  if (sig.sig === "over") return `<td style="border-left:2px solid rgba(224,201,127,.15)"><span class="csig-over">▲ ${sig.label}</span><div class="csig-sub">O3.5: ${(ou.over35*100).toFixed(1)}% · O2.5: ${over25pct}%</div></td>`;
-  if (sig.sig === "under") return `<td style="border-left:2px solid rgba(224,201,127,.15)"><span class="csig-under">▼ ${sig.label}</span><div class="csig-sub">U1.5: ${(ou.under15*100).toFixed(1)}% · λ: ${lT}</div></td>`;
+  if (sig.sig === "over") return `<td style="border-left:2px solid rgba(224,201,127,.15)"><span class="csig-over">  ${sig.label}</span><div class="csig-sub">O3.5: ${(ou.over35*100).toFixed(1)}%   O2.5: ${over25pct}%</div></td>`;
+  if (sig.sig === "under") return `<td style="border-left:2px solid rgba(224,201,127,.15)"><span class="csig-under">  ${sig.label}</span><div class="csig-sub">U1.5: ${(ou.under15*100).toFixed(1)}%    : ${lT}</div></td>`;
   return `<td style="border-left:2px solid rgba(224,201,127,.15)"><span class="csig-none">No Edge</span><div class="csig-sub">O3.5: ${(ou.over35*100).toFixed(1)}% U1.5: ${(ou.under15*100).toFixed(1)}%</div></td>`;
 }
 
@@ -3678,33 +3445,33 @@ function renderTable(rows){
     const btts_raw=r.mBTTS_raw!==null?+(r.mBTTS_raw*100).toFixed(1):null;
     const btts_adj=r.mBTTS_adj!==null?+(r.mBTTS_adj*100).toFixed(1):null;
     const bttsDisplay = osiMode==='both' && btts_raw!==null && btts_adj!==null
-      ? `<span style="color:var(--t3)">${btts_raw}%</span><span style="color:var(--t3);margin:0 3px">→</span><span style="color:var(--accent)">${btts_adj}%</span>`
-      : (btts!==null?btts+'%':'—');
+      ? `<span style="color:var(--t3)">${btts_raw}%</span><span style="color:var(--t3);margin:0 3px"> </span><span style="color:var(--accent)">${btts_adj}%</span>`
+      : (btts!==null?btts+'%':' ');
     const pill=(!H.found||!A.found)?'<span class="pill p-err">No data</span>':
                (H.low||A.low)?'<span class="pill p-warn">Low N</span>':
-               '<span class="pill p-ok">✓</span>';
-    // ── kickoff / date / round display ──
+               '<span class="pill p-ok"> </span>';
+    // -- kickoff / date / round display --
     const koTime = r.kickoff ? r.kickoff.split(' ')[1] || '' : '';
     const koDate = r.date || (r.kickoff ? r.kickoff.split(' ')[0] : '');
     const koLabel = koTime ? `<span class="fix-ko">${koDate} <b>${koTime}</b> UTC</span>` :
                    koDate  ? `<span class="fix-ko">${koDate}</span>` : '';
     const rdLabel = r.round ? `<span class="fix-rd">${r.round}</span>` : '';
-    const lgLabel = r.league ? `<span class="fix-lg">${r.league}${r.country?' · '+r.country:''}</span>` : '';
+    const lgLabel = r.league ? `<span class="fix-lg">${r.league}${r.country?'   '+r.country:''}</span>` : '';
     const isHot=btts!==null&&btts>=70;
-    // λ display — show adj badge in adj/both modes
+    //   display   show adj badge in adj/both modes
     const hLamDisp = H.found ? (osiMode==='both'
-      ? `<span style="color:var(--t3);font-size:.65rem">${fmt2(H.lS_raw)}</span><span style="color:var(--t3);margin:0 2px">→</span><span style="color:var(--accent)">${fmt2(H.lS_adj)}</span>`
-      : fmt2(H.lS)) : '—';
+      ? `<span style="color:var(--t3);font-size:.65rem">${fmt2(H.lS_raw)}</span><span style="color:var(--t3);margin:0 2px"> </span><span style="color:var(--accent)">${fmt2(H.lS_adj)}</span>`
+      : fmt2(H.lS)) : ' ';
     const aLamDisp = A.found ? (osiMode==='both'
-      ? `<span style="color:var(--t3);font-size:.65rem">${fmt2(A.lS_raw)}</span><span style="color:var(--t3);margin:0 2px">→</span><span style="color:var(--accent)">${fmt2(A.lS_adj)}</span>`
-      : fmt2(A.lS)) : '—';
+      ? `<span style="color:var(--t3);font-size:.65rem">${fmt2(A.lS_raw)}</span><span style="color:var(--t3);margin:0 2px"> </span><span style="color:var(--accent)">${fmt2(A.lS_adj)}</span>`
+      : fmt2(A.lS)) : ' ';
     return`<tr class="${isHot?'hot':''}" data-i="${i}" style="animation-delay:${Math.min(i*12,400)}ms">
       <td class="col-fix"><span class="td-fix">${r.fixture}</span> ${pill}${koLabel||rdLabel||lgLabel?`<div class="fix-meta">${koLabel}${rdLabel}${lgLabel}</div>`:''}</td>
       <!-- O/U SIGNAL -->
       ${conservCell(r)}
       <!-- BTTS: Home, Away, Match -->
-      <td class="tb ${H.found?bttsClass(H.btts*100):''}" style="border-left:2px solid rgba(123,140,255,.18)">${H.found?fmtPct(H.btts):'—'}${H.found?sparkbar(H.btts,'lm',maxBT):''}</td>
-      <td class="tb ${A.found?bttsClass(A.btts*100):''}">${A.found?fmtPct(A.btts):'—'}${A.found?sparkbar(A.btts,'lm',maxBT):''}</td>
+      <td class="tb ${H.found?bttsClass(H.btts*100):''}" style="border-left:2px solid rgba(123,140,255,.18)">${H.found?fmtPct(H.btts):' '}${H.found?sparkbar(H.btts,'lm',maxBT):''}</td>
+      <td class="tb ${A.found?bttsClass(A.btts*100):''}">${A.found?fmtPct(A.btts):' '}${A.found?sparkbar(A.btts,'lm',maxBT):''}</td>
       <td class="tb ${btts!==null?bttsClass(btts):''}">${bttsDisplay}${r.mBTTS!==null&&osiMode!=='both'?sparkbar(r.mBTTS,'lm',maxBT):''}</td>
       <!-- FORM -->
       ${formCell(H.form,A.form,r.formDiff)}
@@ -3715,7 +3482,7 @@ function renderTable(rows){
     </tr>`;
   }).join('');
 
-  // click → drawer
+  // click   drawer
   tbody.querySelectorAll('tr').forEach(tr=>{
     tr.addEventListener('click',()=>{ const i=parseInt(tr.dataset.i); if(!isNaN(i))openDrawer(visRows[i]); });
   });
@@ -3759,97 +3526,74 @@ function sv(r,k){
 }
 
 
-// ═══════════════════════════════════════════════
+// ===============================================
 // DEEP DIVE DRAWER
-// ═══════════════════════════════════════════════
+// ===============================================
 function openDrawer(r){
   document.getElementById('dFix').textContent=r.fixture;
-  const koStr = r.kickoff ? ` · ${r.kickoff} UTC` : (r.date ? ` · ${r.date}` : '');
-  const rdStr = r.round   ? ` · ${r.round}` : '';
-  document.getElementById('dSub').textContent=`${r.league}${koStr}${rdStr} · ${r.H.found?r.H.N:0} home / ${r.A.found?r.A.N:0} away games used`;
+  const koStr = r.kickoff ? `   ${r.kickoff} UTC` : (r.date ? `   ${r.date}` : '');
+  const rdStr = r.round   ? `   ${r.round}` : '';
+  document.getElementById('dSub').textContent=`${r.league}${koStr}${rdStr}   ${r.H.found?r.H.N:0} home / ${r.A.found?r.A.N:0} away games used`;
   document.getElementById('dBody').innerHTML=ensembleSection(r)+teamSection(r.H,'Home')+teamSection(r.A,'Away');
   document.getElementById('drawer').classList.add('open');
   document.getElementById('ov').classList.add('open');
 }
 
 function ensembleSection(r) {
-  const pBTTS  = r.mBTTS !== null ? (r.mBTTS*100).toFixed(1)+'%' : '—';
-  // Elo does NOT contribute to BTTS — show N/A with explanation
-  const eloBTTS= '— (W/D/L only)';
-  const fmBTTS = r.formH && r.formA ? (((r.formH.bttsFactor+r.formA.bttsFactor)/2)*100).toFixed(1)+'%' : '—';
-  const ensBTTS= r.ensBTTS !== null ? (r.ensBTTS*100).toFixed(1)+'%' : '—';
-  const rhoDisp = r.rho !== undefined ? r.rho.toFixed(3) : '—';
+  const pBTTS  = r.mBTTS !== null ? (r.mBTTS*100).toFixed(1)+'%' : ' ';
+  // Elo does NOT contribute to BTTS   show N/A with explanation
+  const eloBTTS= '  (W/D/L only)';
+  const fmBTTS = r.formH && r.formA ? (((r.formH.bttsFactor+r.formA.bttsFactor)/2)*100).toFixed(1)+'%' : ' ';
+  const ensBTTS= r.ensBTTS !== null ? (r.ensBTTS*100).toFixed(1)+'%' : ' ';
+  const rhoDisp = r.rho !== undefined ? r.rho.toFixed(3) : ' ';
 
-  // DC λ display — now includes intent adjustment transparency
-  const hasIntent = r.dcLambdas && (r.dcLambdas.intentHome !== undefined) &&
-    (r.dcLambdas.intentHome !== 1 || r.dcLambdas.defenseAway !== 1 ||
-     r.dcLambdas.intentAway !== 1 || r.dcLambdas.defenseHome !== 1);
-  const intentBadge = hasIntent ? `
-    <div style="margin-top:10px;padding:9px 11px;background:rgba(0,229,160,.05);border:1px solid rgba(0,229,160,.15);border-radius:7px">
-      <div style="font-family:var(--mono);font-size:.5rem;letter-spacing:1.5px;text-transform:uppercase;color:#00e5a0;margin-bottom:7px">🎯 xG / SOT Intent Adjustment</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <div style="font-family:var(--mono);font-size:.6rem">
-          <div style="color:var(--t3);margin-bottom:3px">HOME attack intent</div>
-          <div>xG sig: <b style="color:${r.dcLambdas.intentHome>=1?'var(--accent)':'var(--a2)'}">${r.dcLambdas.intentHome?.toFixed(4)??'—'}</b></div>
-          <div>Def away: <b style="color:${r.dcLambdas.defenseAway>=1?'var(--accent)':'var(--a2)'}">${r.dcLambdas.defenseAway?.toFixed(4)??'—'}</b></div>
-          <div style="margin-top:4px">λ base→final: <b style="color:var(--t1)">${r.dcLambdas.lambdaHomeBase?.toFixed(3)??'—'}</b> → <b style="color:var(--accent)">${r.dcLambdas.lambdaHome?.toFixed(3)??'—'}</b></div>
-        </div>
-        <div style="font-family:var(--mono);font-size:.6rem">
-          <div style="color:var(--t3);margin-bottom:3px">AWAY attack intent</div>
-          <div>xG sig: <b style="color:${r.dcLambdas.intentAway>=1?'var(--accent)':'var(--a2)'}">${r.dcLambdas.intentAway?.toFixed(4)??'—'}</b></div>
-          <div>Def home: <b style="color:${r.dcLambdas.defenseHome>=1?'var(--accent)':'var(--a2)'}">${r.dcLambdas.defenseHome?.toFixed(4)??'—'}</b></div>
-          <div style="margin-top:4px">λ base→final: <b style="color:var(--t1)">${r.dcLambdas.lambdaAwayBase?.toFixed(3)??'—'}</b> → <b style="color:var(--a3)">${r.dcLambdas.lambdaAway?.toFixed(3)??'—'}</b></div>
-        </div>
-      </div>
-    </div>` : (r.H.found && r.A.found && !r.H.hasXg && !r.H.hasSot && !r.A.hasXg && !r.A.hasSot) ? `
-    <div style="margin-top:8px;padding:7px 10px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:6px;font-family:var(--mono);font-size:.55rem;color:var(--t3)">
-      ⚪ No xG/SOT data — intent signals inactive (goal-only mode)
-    </div>` : '';
-
+  // DC   display
   const dcSection = r.dcLambdas ? `
   <div style="margin-bottom:18px;padding:12px;background:rgba(123,140,255,.06);border:1px solid rgba(123,140,255,.2);border-radius:10px">
-    <div style="font-family:var(--mono);font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:#7b8cff;margin-bottom:10px">⚖ Attack / Defence Model</div>
+    <div style="font-family:var(--mono);font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:#7b8cff;margin-bottom:10px">  Attack / Defence Model</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
       <div style="padding:10px;background:rgba(0,0,0,.25);border-radius:7px;text-align:center">
-        <div style="font-family:var(--mono);font-size:.58rem;color:var(--t3);margin-bottom:4px">Home λ (DC)</div>
+        <div style="font-family:var(--mono);font-size:.58rem;color:var(--t3);margin-bottom:4px">Home   (DC)</div>
         <div style="font-size:1.1rem;font-weight:700;color:var(--accent)">${r.dcLambdas.lambdaHome.toFixed(3)}</div>
-        <div style="font-family:var(--mono);font-size:.52rem;color:var(--t3)">Atk×${r.H.attackRating?r.H.attackRating.toFixed(2):'—'} · Def×${r.A.defenceRating?r.A.defenceRating.toFixed(2):'—'}</div>
+        <div style="font-family:var(--mono);font-size:.52rem;color:var(--t3)">Atk ${r.H.attackRating?r.H.attackRating.toFixed(2):' '}   Def ${r.A.defenceRating?r.A.defenceRating.toFixed(2):' '}</div>
       </div>
       <div style="padding:10px;background:rgba(0,0,0,.25);border-radius:7px;text-align:center">
-        <div style="font-family:var(--mono);font-size:.58rem;color:var(--t3);margin-bottom:4px">Away λ (DC)</div>
+        <div style="font-family:var(--mono);font-size:.58rem;color:var(--t3);margin-bottom:4px">Away   (DC)</div>
         <div style="font-size:1.1rem;font-weight:700;color:var(--a3)">${r.dcLambdas.lambdaAway.toFixed(3)}</div>
-        <div style="font-family:var(--mono);font-size:.52rem;color:var(--t3)">Atk×${r.A.attackRating?r.A.attackRating.toFixed(2):'—'} · Def×${r.H.defenceRating?r.H.defenceRating.toFixed(2):'—'}</div>
+        <div style="font-family:var(--mono);font-size:.52rem;color:var(--t3)">Atk ${r.A.attackRating?r.A.attackRating.toFixed(2):' '}   Def ${r.H.defenceRating?r.H.defenceRating.toFixed(2):' '}</div>
       </div>
     </div>
     <div style="display:flex;gap:16px;font-family:var(--mono);font-size:.58rem;color:var(--t3)">
       <span>League avg: <b style="color:var(--t1)">${r.dcLambdas.leagueAvg.toFixed(2)}</b></span>
-      <span>Home adv: <b style="color:var(--t1)">×${r.dcLambdas.homeAdvFactor.toFixed(3)}</b></span>
-      <span>Away adv: <b style="color:var(--t1)">×${r.dcLambdas.awayAdvFactor.toFixed(3)}</b></span>
+      <span>Home adv: <b style="color:var(--t1)"> ${r.dcLambdas.homeAdvFactor.toFixed(3)}</b></span>
+      <span>Away adv: <b style="color:var(--t1)"> ${r.dcLambdas.awayAdvFactor.toFixed(3)}</b></span>
     </div>
-    ${intentBadge}
   </div>` : '';
 
-  const hWin  = r.eloProbs ? (r.eloProbs.homeWin*100).toFixed(1)+'%' : '—';
-  const draw  = r.eloProbs ? (r.eloProbs.draw*100).toFixed(1)+'%' : '—';
-  const aWin  = r.eloProbs ? (r.eloProbs.awayWin*100).toFixed(1)+'%' : '—';
-  const eHelo = r.eloProbs ? r.eloProbs.homeElo : '—';
-  const eAelo = r.eloProbs ? r.eloProbs.awayElo : '—';
+  // -- xG/SOT signal indicator (shown only when model was activated) -
+  const xgSotBadge = r.xgSotProbs ? `<div style="display:inline-flex;align-items:center;gap:6px;background:rgba(0,200,120,0.08);border:1px solid rgba(0,200,120,0.25);border-radius:5px;padding:3px 8px;font-family:var(--mono);font-size:0.58rem;color:#00c878;margin-top:4px;"><span title="xG/SOT supplementary model active">&#9889; xG/SOT</span><span style="color:var(--t3)">H:${(r.xgSotProbs.homeWin*100).toFixed(1)}%</span><span style="color:var(--t3)">D:${(r.xgSotProbs.draw*100).toFixed(1)}%</span><span style="color:var(--t3)">A:${(r.xgSotProbs.awayWin*100).toFixed(1)}%</span><span style="opacity:.5;font-size:.55rem">(w=7%)</span></div>` : '';
+
+  const hWin  = r.eloProbs ? (r.eloProbs.homeWin*100).toFixed(1)+'%' : ' ';
+  const draw  = r.eloProbs ? (r.eloProbs.draw*100).toFixed(1)+'%' : ' ';
+  const aWin  = r.eloProbs ? (r.eloProbs.awayWin*100).toFixed(1)+'%' : ' ';
+  const eHelo = r.eloProbs ? r.eloProbs.homeElo : ' ';
+  const eAelo = r.eloProbs ? r.eloProbs.awayElo : ' ';
   const eloDiff= r.eloProbs ? r.eloProbs.eloDiff : 0;
 
-  const hTrend = r.formH ? r.formH.trend : '—';
-  const aTrend = r.formA ? r.formA.trend : '—';
-  const hSlope = r.formH ? r.formH.slope.toFixed(3) : '—';
-  const aSlope = r.formA ? r.formA.slope.toFixed(3) : '—';
-  const hAccel = r.formH ? r.formH.accel.toFixed(3) : '—';
-  const aAccel = r.formA ? r.formA.accel.toFixed(3) : '—';
-  const hMom   = r.formH ? r.formH.momentum.toFixed(2) : '—';
-  const aMom   = r.formA ? r.formA.momentum.toFixed(2) : '—';
+  const hTrend = r.formH ? r.formH.trend : ' ';
+  const aTrend = r.formA ? r.formA.trend : ' ';
+  const hSlope = r.formH ? r.formH.slope.toFixed(3) : ' ';
+  const aSlope = r.formA ? r.formA.slope.toFixed(3) : ' ';
+  const hAccel = r.formH ? r.formH.accel.toFixed(3) : ' ';
+  const aAccel = r.formA ? r.formA.accel.toFixed(3) : ' ';
+  const hMom   = r.formH ? r.formH.momentum.toFixed(2) : ' ';
+  const aMom   = r.formA ? r.formA.momentum.toFixed(2) : ' ';
 
-  const conf = r.conf || { pct:0, label:'—', components:{} };
+  const conf = r.conf || { pct:0, label:' ', components:{} };
   const confCls = conf.label==='HIGH' ? 'conf-hi' : conf.label==='MED' ? 'conf-md' : 'conf-lo';
   const confColor = conf.label==='HIGH' ? '#00e5a0' : conf.label==='MED' ? '#ffd166' : '#ff4d6d';
 
-  const trendIcon = t => t==='rising'?'↑':t==='falling'?'↓':'→';
+  const trendIcon = t => t==='rising'?' ':t==='falling'?' ':' ';
   const trendColor = t => t==='rising'?'var(--accent)':t==='falling'?'var(--a2)':'var(--t2)';
 
   const ensOutH  = r.ensOutcomes ? (r.ensOutcomes.hw*100).toFixed(1)+'%' : hWin;
@@ -3858,26 +3602,27 @@ function ensembleSection(r) {
 
   return `<div style="border-bottom:1px solid var(--gb);padding-bottom:16px;margin-bottom:16px">
     <div style="font-size:.7rem;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px">
-      🔀 Ensemble Prediction ${ensMode==='ensemble'?'<span style="color:var(--accent);font-size:.58rem">(ACTIVE)</span>':'<span style="color:var(--t3);font-size:.58rem">(Enable in sidebar)</span>'}
+         Ensemble Prediction ${ensMode==='ensemble'?'<span style="color:var(--accent);font-size:.58rem">(ACTIVE)</span>':'<span style="color:var(--t3);font-size:.58rem">(Enable in sidebar)</span>'}
     </div>
 
     ${dcSection}
+    ${xgSotBadge}
 
     <!-- Model cards -->
     <div class="model-grid">
       <div class="model-card">
         <div class="mc-val" style="color:var(--a4)">${pBTTS}</div>
-        <div class="mc-lbl">🔵 Poisson+DC</div>
-        <div class="mc-sub">BTTS · ρ=${rhoDisp}</div>
+        <div class="mc-lbl">   Poisson+DC</div>
+        <div class="mc-sub">BTTS    =${rhoDisp}</div>
       </div>
       <div class="model-card">
         <div class="mc-val" style="color:#ffd166">${hWin} / ${draw} / ${aWin}</div>
-        <div class="mc-lbl">🟡 Elo (1X2)</div>
-        <div class="mc-sub">H:${eHelo} A:${eAelo} (Δ${eloDiff>0?'+':''}${eloDiff})</div>
+        <div class="mc-lbl">   Elo (1X2)</div>
+        <div class="mc-sub">H:${eHelo} A:${eAelo} ( ${eloDiff>0?'+':''}${eloDiff})</div>
       </div>
       <div class="model-card">
         <div class="mc-val" style="color:#ff8a80">${fmBTTS}</div>
-        <div class="mc-lbl">🔴 Form</div>
+        <div class="mc-lbl">   Form</div>
         <div class="mc-sub">${r.home}: <span style="color:${trendColor(hTrend)}">${trendIcon(hTrend)}</span> ${r.away}: <span style="color:${trendColor(aTrend)}">${trendIcon(aTrend)}</span></div>
       </div>
     </div>
@@ -3904,7 +3649,7 @@ function ensembleSection(r) {
         <div style="font-size:.62rem;color:var(--t3);margin-bottom:6px;text-transform:uppercase">${r.home} Form</div>
         <div style="font-size:.72rem;display:flex;flex-direction:column;gap:3px">
           <span>Trend: <b style="color:${trendColor(hTrend)}">${hTrend} ${trendIcon(hTrend)}</b></span>
-          <span style="color:var(--t2)">Slope: <b style="color:var(--t1)">${hSlope}</b> · Accel: <b>${hAccel}</b></span>
+          <span style="color:var(--t2)">Slope: <b style="color:var(--t1)">${hSlope}</b>   Accel: <b>${hAccel}</b></span>
           <span style="color:var(--t2)">Momentum: <b style="color:var(--t1)">${hMom}</b></span>
         </div>
       </div>
@@ -3912,7 +3657,7 @@ function ensembleSection(r) {
         <div style="font-size:.62rem;color:var(--t3);margin-bottom:6px;text-transform:uppercase">${r.away} Form</div>
         <div style="font-size:.72rem;display:flex;flex-direction:column;gap:3px">
           <span>Trend: <b style="color:${trendColor(aTrend)}">${aTrend} ${trendIcon(aTrend)}</b></span>
-          <span style="color:var(--t2)">Slope: <b style="color:var(--t1)">${aSlope}</b> · Accel: <b>${aAccel}</b></span>
+          <span style="color:var(--t2)">Slope: <b style="color:var(--t1)">${aSlope}</b>   Accel: <b>${aAccel}</b></span>
           <span style="color:var(--t2)">Momentum: <b style="color:var(--t1)">${aMom}</b></span>
         </div>
       </div>
@@ -3937,26 +3682,26 @@ function ensembleSection(r) {
     <!-- Conservative O/U Signal in drawer -->
     <div style="margin-top:12px;padding:12px;background:rgba(224,201,127,.06);border:1px solid rgba(224,201,127,.2);border-radius:8px">
       <div style="font-size:.62rem;font-weight:700;color:#e0c97f;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">
-        ⚡ Conservative O/U Signal
+          Conservative O/U Signal
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px">
         <div style="text-align:center;padding:8px;background:rgba(0,0,0,.2);border-radius:6px">
-          <div style="font-family:var(--mono);font-size:.9rem;font-weight:700;color:var(--accent)">${r.lambdaTotal !== null ? r.lambdaTotal.toFixed(2) : '—'}</div>
-          <div style="font-size:.58rem;color:var(--t3);margin-top:2px">λ Total</div>
+          <div style="font-family:var(--mono);font-size:.9rem;font-weight:700;color:var(--accent)">${r.lambdaTotal !== null ? r.lambdaTotal.toFixed(2) : ' '}</div>
+          <div style="font-size:.58rem;color:var(--t3);margin-top:2px">  Total</div>
         </div>
         <div style="text-align:center;padding:8px;background:rgba(0,0,0,.2);border-radius:6px">
-          <div style="font-family:var(--mono);font-size:.9rem;font-weight:700;color:var(--accent)">${r.conservOU ? (r.conservOU.over35*100).toFixed(1)+'%' : '—'}</div>
+          <div style="font-family:var(--mono);font-size:.9rem;font-weight:700;color:var(--accent)">${r.conservOU ? (r.conservOU.over35*100).toFixed(1)+'%' : ' '}</div>
           <div style="font-size:.58rem;color:var(--t3);margin-top:2px">P(goals &gt; 3.5)</div>
         </div>
         <div style="text-align:center;padding:8px;background:rgba(0,0,0,.2);border-radius:6px">
-          <div style="font-family:var(--mono);font-size:.9rem;font-weight:700;color:#7b8cff">${r.conservOU ? (r.conservOU.under15*100).toFixed(1)+'%' : '—'}</div>
-          <div style="font-size:.58rem;color:var(--t3);margin-top:2px">P(goals ≤ 1)</div>
+          <div style="font-family:var(--mono);font-size:.9rem;font-weight:700;color:#7b8cff">${r.conservOU ? (r.conservOU.under15*100).toFixed(1)+'%' : ' '}</div>
+          <div style="font-size:.58rem;color:var(--t3);margin-top:2px">P(goals   1)</div>
         </div>
       </div>
       <div style="display:flex;align-items:center;justify-content:space-between">
-        <span style="font-size:.65rem;color:var(--t2)">Signal (thresholds: O3.5≥${OVER35_THRESHOLD.toFixed(2)} / U1.5≥${UNDER15_THRESHOLD.toFixed(2)})</span>
-        ${r.conservSig && r.conservSig.sig === 'over'  ? '<span class="csig-over">▲ Strong Over</span>' :
-          r.conservSig && r.conservSig.sig === 'under' ? '<span class="csig-under">▼ Strong Under</span>' :
+        <span style="font-size:.65rem;color:var(--t2)">Signal (thresholds: O3.5 ${OVER35_THRESHOLD.toFixed(2)} / U1.5 ${UNDER15_THRESHOLD.toFixed(2)})</span>
+        ${r.conservSig && r.conservSig.sig === 'over'  ? '<span class="csig-over">  Strong Over</span>' :
+          r.conservSig && r.conservSig.sig === 'under' ? '<span class="csig-under">  Strong Under</span>' :
           '<span class="csig-none">No Edge</span>'}
       </div>
     </div>
@@ -3973,32 +3718,32 @@ function teamSection(T,label){
   const used=T.rawMatches.filter(m=>m.used).length;
   const rows=T.rawMatches.slice().reverse().map(m=>{
     const res=m.scored>m.conceded?'w':m.scored<m.conceded?'l':'d';
-    const sc=m.venue==='H'?`${m.hg}–${m.ag}`:`${m.ag}–${m.hg}`;
+    const sc=m.venue==='H'?`${m.hg} ${m.ag}`:`${m.ag} ${m.hg}`;
     return`<tr class="${m.used?'':'old'}">
-      <td class="ht-date">${m.date||'—'}</td>
+      <td class="ht-date">${m.date||' '}</td>
       <td><span class="ht-v ${m.venue==='H'?'h':'a'}">${m.venue}</span></td>
-      <td class="ht-opp">${m.opponent||'—'}</td>
+      <td class="ht-opp">${m.opponent||' '}</td>
       <td class="ht-sc ${res}">${sc}</td>
-      <td class="ht-cs">${m.conceded===0?'✓':''}</td>
+      <td class="ht-cs">${m.conceded===0?' ':''}</td>
       <td>${m.used?'<span class="ht-used">Used</span>':''}</td>
     </tr>`;
   }).join('');
 
-  // ── frequency adjustment panel ──────────────────────────────────────
+  // -- frequency adjustment panel --------------------------------------
   const hasFq = T.fatigueFactor !== undefined && !T.freqLowConf;
   const fqColor = v => v > 1.02 ? 'var(--accent)' : v < 0.98 ? 'var(--a2)' : 'var(--t1)';
   const fqSign  = v => v > 0 ? '+' : '';
   const freqSection = hasFq ? `
   <div style="margin:10px 0;padding:11px 12px;background:rgba(0,185,255,.05);border:1px solid rgba(0,185,255,.18);border-radius:8px">
-    <div style="font-family:var(--mono);font-size:.5rem;letter-spacing:2px;text-transform:uppercase;color:#00b9ff;margin-bottom:8px">⏱ Match Frequency Adjustment</div>
+    <div style="font-family:var(--mono);font-size:.5rem;letter-spacing:2px;text-transform:uppercase;color:#00b9ff;margin-bottom:8px">  Match Frequency Adjustment</div>
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:8px">
       <div style="text-align:center;padding:7px;background:rgba(0,0,0,.25);border-radius:6px">
         <div style="font-family:var(--mono);font-size:.9rem;font-weight:700;color:${fqColor(T.fatigueFactor)}">${T.fatigueFactor.toFixed(3)}</div>
-        <div style="font-size:.52rem;color:var(--t3);margin-top:2px">Fatigue ×atk</div>
+        <div style="font-size:.52rem;color:var(--t3);margin-top:2px">Fatigue  atk</div>
       </div>
       <div style="text-align:center;padding:7px;background:rgba(0,0,0,.25);border-radius:6px">
         <div style="font-family:var(--mono);font-size:.9rem;font-weight:700;color:${fqColor(T.restBoost)}">${T.restBoost.toFixed(3)}</div>
-        <div style="font-size:.52rem;color:var(--t3);margin-top:2px">Rest Boost ×atk</div>
+        <div style="font-size:.52rem;color:var(--t3);margin-top:2px">Rest Boost  atk</div>
       </div>
       <div style="text-align:center;padding:7px;background:rgba(0,0,0,.25);border-radius:6px">
         <div style="font-family:var(--mono);font-size:.9rem;font-weight:700;color:var(--a4)">${T.windowDays.toFixed(0)}d</div>
@@ -4009,35 +3754,12 @@ function teamSection(T,label){
       <span>Density: <b style="color:var(--t1)">${(T.density * 7).toFixed(2)}/wk</b></span>
       <span>Last rest: <b style="color:var(--t1)">${T.lastRestDays.toFixed(0)}d ago</b></span>
       <span>League avg rest: <b style="color:var(--t1)">${(_leagueFreqStats.avgRest||7).toFixed(1)}d</b></span>
-      <span>Net λ Δ: <b style="color:${T.lS_freq>T.lS_raw?'var(--accent)':'var(--a2)'}">${fqSign(T.lS_freq-T.lS_raw)}${(T.lS_freq-T.lS_raw).toFixed(3)}</b></span>
+      <span>Net    : <b style="color:${T.lS_freq>T.lS_raw?'var(--accent)':'var(--a2)'}">${fqSign(T.lS_freq-T.lS_raw)}${(T.lS_freq-T.lS_raw).toFixed(3)}</b></span>
     </div>
   </div>` : (T.freqLowConf ? `
   <div style="margin:8px 0;padding:8px 12px;background:rgba(255,209,102,.06);border:1px solid rgba(255,209,102,.2);border-radius:7px;font-family:var(--mono);font-size:.55rem;color:#ffd166">
-    ⚠ Too few dated matches for frequency adjustment (min ${FREQ_CONFIG.minMatches})
+      Too few dated matches for frequency adjustment (min ${FREQ_CONFIG.minMatches})
   </div>` : '');
-
-  // ── xG / SOT intent signal panel ───────────────────────────────────────
-  const hasIntentData = T.hasXg || T.hasSot || T.hasXga || T.hasSotFaced;
-  const intentPanel = hasIntentData ? `
-  <div style="margin:10px 0;padding:11px 12px;background:rgba(0,229,160,.04);border:1px solid rgba(0,229,160,.14);border-radius:8px">
-    <div style="font-family:var(--mono);font-size:.5rem;letter-spacing:2px;text-transform:uppercase;color:#00e5a0;margin-bottom:8px">🎯 xG / SOT Intent Signals</div>
-    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:7px;margin-bottom:7px">
-      <div style="text-align:center;padding:7px;background:rgba(0,0,0,.25);border-radius:6px">
-        <div style="font-family:var(--mono);font-size:.85rem;font-weight:700;color:${T.intentMultiplier>=1?'var(--accent)':'var(--a2)'}">${(T.intentMultiplier||1).toFixed(4)}</div>
-        <div style="font-size:.52rem;color:var(--t3);margin-top:2px">Attack Intent ×λ</div>
-      </div>
-      <div style="text-align:center;padding:7px;background:rgba(0,0,0,.25);border-radius:6px">
-        <div style="font-family:var(--mono);font-size:.85rem;font-weight:700;color:${T.defenseMultiplier>=1?'var(--a2)':'var(--accent)'}">${(T.defenseMultiplier||1).toFixed(4)}</div>
-        <div style="font-size:.52rem;color:var(--t3);margin-top:2px">Defence Perm. ×opp</div>
-      </div>
-    </div>
-    <div style="display:flex;flex-wrap:wrap;gap:10px;font-family:var(--mono);font-size:.55rem;color:var(--t3)">
-      ${T.hasXg  ? `<span>xG sig: <b style="color:var(--t1)">${T.xgSignal?.toFixed(4)??'—'}</b></span>` : '<span style="opacity:.5">xG: N/A</span>'}
-      ${T.hasSot ? `<span>SOT sig: <b style="color:var(--t1)">${T.sotSignal?.toFixed(4)??'—'}</b></span>` : '<span style="opacity:.5">SOT: N/A</span>'}
-      ${T.hasXga       ? `<span>xGA sig: <b style="color:var(--t1)">${T.xgaSignal?.toFixed(4)??'—'}</b></span>` : '<span style="opacity:.5">xGA: N/A</span>'}
-      ${T.hasSotFaced  ? `<span>SOT-faced: <b style="color:var(--t1)">${T.sotFacedSignal?.toFixed(4)??'—'}</b></span>` : '<span style="opacity:.5">SOT-faced: N/A</span>'}
-    </div>
-  </div>` : '';
 
   return`<div class="dts">
     <div class="dts-hd">
@@ -4045,15 +3767,14 @@ function teamSection(T,label){
       <div class="dts-badge">${used} of ${T.rawMatches.length} games in sample</div>
     </div>
     <div class="dts-sum">
-      <div class="dts-s"><span class="dts-sv" style="color:var(--a4)">${T.lS_raw.toFixed(2)}</span><span class="dts-sk">λ Scored (raw)</span></div>
-      <div class="dts-s"><span class="dts-sv">${T.lC_raw.toFixed(2)}</span><span class="dts-sk">λ Con. (raw)</span></div>
-      <div class="dts-s"><span class="dts-sv" style="color:var(--accent)">${T.lS_freq!==undefined?T.lS_freq.toFixed(2):T.lS_adj.toFixed(2)}</span><span class="dts-sk">λ Scored (adj)</span></div>
-      <div class="dts-s"><span class="dts-sv" style="color:#ffd166">${T.lC_freq!==undefined?T.lC_freq.toFixed(2):T.lC_adj.toFixed(2)}</span><span class="dts-sk">λ Con. (adj)</span></div>
+      <div class="dts-s"><span class="dts-sv" style="color:var(--a4)">${T.lS_raw.toFixed(2)}</span><span class="dts-sk">  Scored (raw)</span></div>
+      <div class="dts-s"><span class="dts-sv">${T.lC_raw.toFixed(2)}</span><span class="dts-sk">  Con. (raw)</span></div>
+      <div class="dts-s"><span class="dts-sv" style="color:var(--accent)">${T.lS_freq!==undefined?T.lS_freq.toFixed(2):T.lS_adj.toFixed(2)}</span><span class="dts-sk">  Scored (adj)</span></div>
+      <div class="dts-s"><span class="dts-sv" style="color:#ffd166">${T.lC_freq!==undefined?T.lC_freq.toFixed(2):T.lC_adj.toFixed(2)}</span><span class="dts-sk">  Con. (adj)</span></div>
       <div class="dts-s"><span class="dts-sv" style="color:var(--accent)">${T.cs}</span><span class="dts-sk">Clean Sheets</span></div>
-      <div class="dts-s"><span class="dts-sv" style="color:${T.form!==null?scoreCol(T.form):'var(--t1)'}">${T.form!==null?T.form.toFixed(1):'—'}</span><span class="dts-sk">Form Score</span></div>
+      <div class="dts-s"><span class="dts-sv" style="color:${T.form!==null?scoreCol(T.form):'var(--t1)'}">${T.form!==null?T.form.toFixed(1):' '}</span><span class="dts-sk">Form Score</span></div>
     </div>
     ${freqSection}
-    ${intentPanel}
     <table class="ht">
       <thead><tr><th>Date</th><th>H/A</th><th>Opponent</th><th>Score</th><th>CS</th><th>Sample</th></tr></thead>
       <tbody>${rows}</tbody>
@@ -4061,13 +3782,13 @@ function teamSection(T,label){
   </div>`;
 }
 
-// ═══════════════════════════════════════════════
+// ===============================================
 // EXPORTS
-// ═══════════════════════════════════════════════
+// ===============================================
 document.getElementById('csvBtn').addEventListener('click',()=>{
   if(!visRows.length)return;
-  const hdr=['League','Fixture','Home','Away','Home N','Home λ Scr','Home λ Con','Home CS','Home BTTS%','Away N','Away λ Scr','Away λ Con','Away CS','Away BTTS%','Match BTTS%','Home Form','Away Form','Form Diff','Home xG Sig','Home SOT Sig','Away xG Sig','Away SOT Sig','Intent H','Intent A'];
-  const body=visRows.map(r=>{const H=r.H,A=r.A;return[r.league,`"${r.fixture}"`,`"${r.home}"`,`"${r.away}"`,H.found?H.N:'',H.found?H.lS:'',H.found?H.lC:'',H.found?H.cs:'',H.found?(H.btts*100).toFixed(1):'',A.found?A.N:'',A.found?A.lS:'',A.found?A.lC:'',A.found?A.cs:'',A.found?(A.btts*100).toFixed(1):'',r.mBTTS!==null?(r.mBTTS*100).toFixed(1):'',H.form!==null?H.form:'',A.form!==null?A.form:'',r.formDiff!==null?r.formDiff:'',H.found?(H.xgSignal||1).toFixed(4):'',H.found?(H.sotSignal||1).toFixed(4):'',A.found?(A.xgSignal||1).toFixed(4):'',A.found?(A.sotSignal||1).toFixed(4):'',H.found?(H.intentMultiplier||1).toFixed(4):'',A.found?(A.intentMultiplier||1).toFixed(4):''].join(',');});
+  const hdr=['League','Fixture','Home','Away','Home N','Home   Scr','Home   Con','Home CS','Home BTTS%','Away N','Away   Scr','Away   Con','Away CS','Away BTTS%','Match BTTS%','Home Form','Away Form','Form Diff'];
+  const body=visRows.map(r=>{const H=r.H,A=r.A;return[r.league,`"${r.fixture}"`,`"${r.home}"`,`"${r.away}"`,H.found?H.N:'',H.found?H.lS:'',H.found?H.lC:'',H.found?H.cs:'',H.found?(H.btts*100).toFixed(1):'',A.found?A.N:'',A.found?A.lS:'',A.found?A.lC:'',A.found?A.cs:'',A.found?(A.btts*100).toFixed(1):'',r.mBTTS!==null?(r.mBTTS*100).toFixed(1):'',H.form!==null?H.form:'',A.form!==null?A.form:'',r.formDiff!==null?r.formDiff:''].join(',');});
   const blob=new Blob([[hdr.join(','),...body].join('\n')],{type:'text/csv'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='football_predictions.csv';a.click();
 });
@@ -4085,7 +3806,7 @@ document.getElementById('gamesBtn').addEventListener('click',()=>{
   a.download='fixtures.txt';a.click();
 });
 
-// ── Resizable fixture column ───────────────────────
+// -- Resizable fixture column -----------------------
 (function(){
   const handle = document.getElementById('fixResizeHandle');
   if(!handle) return;
@@ -4093,6 +3814,7 @@ document.getElementById('gamesBtn').addEventListener('click',()=>{
   handle.addEventListener('mousedown', e=>{
     e.preventDefault();
     startX = e.clientX;
+    // current width from CSS variable or default
     startW = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--fix-w')) || 200;
     handle.classList.add('dragging');
     const onMove = e=>{
@@ -4109,211 +3831,6 @@ document.getElementById('gamesBtn').addEventListener('click',()=>{
     document.addEventListener('mouseup', onUp);
   });
 })();
-
-// ═══════════════════════════════════════════════════════════════════
-// FIXTURE FILE UPLOAD
-// ───────────────────────────────────────────────────────────────────
-// Lets the user upload a local .xlsx / .xls file containing upcoming
-// fixtures. The file must have at least two columns for home and away
-// team names. Column names are detected flexibly — the same aliases
-// the existing Drive pipeline already understands plus a few extras:
-//
-//   Home column: HomeTeam | Home | home_team | home | HT
-//   Away column: AwayTeam | Away | away_team | away | AT
-//   Optional  : Date | date | League | league | Round | round
-//
-// On load the sheets are written directly into fixSheets (keyed as
-// "filename::sheetName") so the Run Analysis pipeline sees them
-// exactly like a Drive-loaded fixture file — no extra wiring needed.
-// ═══════════════════════════════════════════════════════════════════
-
-/** Track the name of the currently loaded fixture file (for UI only) */
-let uploadedFixtureFileName = null;
-
-/**
- * Flexible home/away column aliases accepted in the uploaded file.
- * Detection is case-insensitive; first match wins.
- */
-const FIX_HOME_ALIASES = ['hometeam', 'home', 'home_team', 'ht', 'homeside'];
-const FIX_AWAY_ALIASES = ['awayteam', 'away', 'away_team', 'at', 'awayside'];
-
-/**
- * findFixCol(headers, aliases)
- * Returns the first header string (original casing) whose lower-case
- * version matches one of the supplied aliases. Returns null if none match.
- */
-function findFixCol(headers, aliases) {
-  for (const alias of aliases) {
-    const match = headers.find(h => h.toLowerCase().trim() === alias);
-    if (match !== undefined) return match;
-  }
-  return null;
-}
-
-/**
- * validateFixtureSheet(rows, sheetName)
- * Checks that a sheet has recognisable home and away columns.
- * Returns { ok, homeCol, awayCol, error }.
- */
-function validateFixtureSheet(rows, sheetName) {
-  if (!rows || rows.length === 0) {
-    return { ok: false, error: `Sheet "${sheetName}" is empty.` };
-  }
-  const headers = Object.keys(rows[0]);
-  const homeCol = findFixCol(headers, FIX_HOME_ALIASES);
-  const awayCol = findFixCol(headers, FIX_AWAY_ALIASES);
-  if (!homeCol) {
-    return { ok: false, error: `Sheet "${sheetName}": no Home column found. Expected one of: HomeTeam, Home, home_team.` };
-  }
-  if (!awayCol) {
-    return { ok: false, error: `Sheet "${sheetName}": no Away column found. Expected one of: AwayTeam, Away, away_team.` };
-  }
-  return { ok: true, homeCol, awayCol };
-}
-
-/**
- * normaliseFixtureRows(rows, homeCol, awayCol)
- * Remaps rows so that HomeTeam / AwayTeam are always present with those
- * exact names, regardless of what alias the user's file used.
- * All other columns (Date, League, Round …) are kept unchanged.
- */
-function normaliseFixtureRows(rows, homeCol, awayCol) {
-  return rows.map(row => {
-    const out = Object.assign({}, row);
-    // Remap to canonical names expected by getCols() in the pipeline
-    if (homeCol !== 'HomeTeam') { out['HomeTeam'] = row[homeCol]; delete out[homeCol]; }
-    if (awayCol !== 'AwayTeam') { out['AwayTeam'] = row[awayCol]; delete out[awayCol]; }
-    return out;
-  }).filter(row => {
-    // Drop rows where both team names are blank / undefined
-    const h = String(row['HomeTeam'] || '').trim();
-    const a = String(row['AwayTeam'] || '').trim();
-    return h && a;
-  });
-}
-
-/**
- * removeFixtureFile()
- * Clears all fixture sheets that came from the uploaded file and
- * resets the UI back to the empty state.
- */
-function removeFixtureFile() {
-  if (!uploadedFixtureFileName) return;
-
-  // Remove every sheet keyed under this filename
-  Object.keys(fixSheets || {})
-    .filter(k => k.startsWith(uploadedFixtureFileName + '::'))
-    .forEach(k => delete fixSheets[k]);
-
-  uploadedFixtureFileName = null;
-
-  // Reset UI
-  const statusEl = document.getElementById('fixUploadStatus');
-  const removeBtn = document.getElementById('fixRemoveBtn');
-  const labelEl   = document.getElementById('fixUploadLabel');
-  if (statusEl)  { statusEl.textContent = ''; statusEl.className = 'fix-upload-status'; }
-  if (removeBtn) removeBtn.style.display = 'none';
-  if (labelEl)   labelEl.classList.remove('fix-label-loaded');
-
-  // Reset the file input so the same file can be re-uploaded if needed
-  const input = document.getElementById('fileFixtures');
-  if (input) input.value = '';
-
-  log('Fixture file removed.', 'ok');
-  checkReady();
-}
-
-/** Wire up the file input once the DOM is ready */
-document.getElementById('fileFixtures').addEventListener('change', async function(e) {
-  const file = e.target.files[0];
-  if (!file) return;
-
-  const statusEl  = document.getElementById('fixUploadStatus');
-  const removeBtn = document.getElementById('fixRemoveBtn');
-  const labelEl   = document.getElementById('fixUploadLabel');
-
-  // Show loading state
-  statusEl.textContent  = 'Reading file…';
-  statusEl.className    = 'fix-upload-status loading';
-
-  try {
-    // Reuse the existing parseFile() helper — same XLSX parsing as history files
-    const sheets = await parseFile(file);
-    const sheetNames = Object.keys(sheets);
-
-    if (!sheetNames.length) {
-      throw new Error('The file contains no sheets.');
-    }
-
-    // Remove any previously uploaded fixture file from fixSheets
-    if (uploadedFixtureFileName) {
-      Object.keys(fixSheets || {})
-        .filter(k => k.startsWith(uploadedFixtureFileName + '::'))
-        .forEach(k => delete fixSheets[k]);
-    }
-
-    // Ensure fixSheets is initialised
-    if (!fixSheets) fixSheets = {};
-
-    let totalFixtures = 0;
-    let sheetsLoaded  = 0;
-    const warnings    = [];
-
-    for (const sheetName of sheetNames) {
-      const rows = sheets[sheetName];
-      const { ok, homeCol, awayCol, error } = validateFixtureSheet(rows, sheetName);
-
-      if (!ok) {
-        // Sheet doesn't have the right columns — warn and skip
-        warnings.push(error);
-        log(`⚠ Skipped sheet "${sheetName}": ${error}`, 'err');
-        continue;
-      }
-
-      // Normalise column names to what the pipeline expects
-      const normalised = normaliseFixtureRows(rows, homeCol, awayCol);
-      if (!normalised.length) {
-        warnings.push(`Sheet "${sheetName}" had no valid fixture rows.`);
-        continue;
-      }
-
-      // Store under the standard "filename::sheetName" key
-      fixSheets[`${file.name}::${sheetName}`] = normalised;
-      totalFixtures += normalised.length;
-      sheetsLoaded++;
-      log(`✓ Fixtures sheet "${sheetName}": ${normalised.length} fixture(s) (home col: "${homeCol}", away col: "${awayCol}")`, 'ok');
-    }
-
-    if (!sheetsLoaded) {
-      throw new Error(
-        'No valid fixture sheets found. ' +
-        (warnings.length ? warnings[0] : 'Check column names: HomeTeam / Home / home_team and AwayTeam / Away / away_team.')
-      );
-    }
-
-    uploadedFixtureFileName = file.name;
-
-    // Update UI
-    statusEl.textContent = `✓ ${totalFixtures} fixture${totalFixtures !== 1 ? 's' : ''} from ${sheetsLoaded} sheet${sheetsLoaded !== 1 ? 's' : ''}`;
-    statusEl.className   = 'fix-upload-status ok';
-    removeBtn.style.display = 'block';
-    labelEl.classList.add('fix-label-loaded');
-
-    if (warnings.length) {
-      log(`⚠ ${warnings.length} sheet(s) skipped — ${warnings.join(' | ')}`, 'err');
-    }
-
-    log(`✓ Fixture file loaded: "${file.name}" — ${totalFixtures} upcoming fixture(s)`, 'ok');
-    checkReady();
-
-  } catch (err) {
-    statusEl.textContent = `✗ ${err.message}`;
-    statusEl.className   = 'fix-upload-status err';
-    log(`✗ Fixture file error: ${err.message}`, 'err');
-    // Reset input so user can try again
-    e.target.value = '';
-  }
-});
 </script>
 </body>
 </html>
