@@ -953,18 +953,23 @@ img,video,svg{max-width:100%;height:auto}
 const DRIVE_FOLDER_ID = '1FSKEeRH22QXiPPNZ6FmTtC1yuQqKkCtK';
 
 // Historical results files — loaded into histSheets
+// Script 1 files
 const DRIVE_HIST_FILES = [
-  'Europe_Results_Part1.xlsx',   // England, Spain, Germany, Italy
-  'Europe_Results_Part2.xlsx',   // France, Portugal, Netherlands, Belgium, Turkey, Greece, Russia, Ukraine
-  'Europe_Results_Part3.xlsx',   // Scotland, Poland, minor European leagues
-  'Americas_Results.xlsx',       // USA, Brazil, Argentina + others (2026 Season)
-  'Africa_Results.xlsx',         // South Africa, Egypt + other African leagues
-  'Asia_ME_CIS_Results.xlsx',    // Japan, South Korea, Australia, Saudi Arabia etc.
-  'International_Competitions.xlsx', // Champions League, Europa League, Conference League, Libertadores, Sudamericana
+  'Europe 1.xlsx',        // England, Spain, Germany, Italy
+  'Europe 2.xlsx',        // Europe Part 2
+  'Europe 3.xlsx',        // Europe Part 3
+  'The Americas.xlsx',    // USA, Brazil, Argentina, etc.
+  'Africa.xlsx',          // African Leagues
+  'Asia_ME_CIS.xlsx',     // Asia, Middle East, CIS, etc.
+  'International.xlsx',   // International Competitions
 ];
 
-// Fixtures file — loaded into fixSheets (replaces manual upload)
-const DRIVE_FIX_FILE = 'Upcoming_Fixtures.xlsx';
+// Fixtures files — 3 separate files, each with an "All_Fixtures" sheet
+const DRIVE_FIX_FILES = [
+  'fixtures 1.xlsx',
+  'fixtures 2.xlsx',
+  'fixtures 3.xlsx',
+];
 
 let driveAccessToken = null;
 
@@ -1072,7 +1077,7 @@ async function loadFromDrive() {
 async function loadFixturesFromDrive(needsSignIn = true) {
   const btn = document.getElementById('driveFixBtn');
   if (btn) btn.disabled = true;
-  driveFixStatus('Loading fixtures from Drive…', 'loading');
+  driveFixStatus('Loading fixtures from Drive...', 'loading');
 
   try {
     if (needsSignIn) {
@@ -1084,29 +1089,57 @@ async function loadFixturesFromDrive(needsSignIn = true) {
       }
     }
 
-    const result = await driveDownloadFile(DRIVE_FIX_FILE, driveAccessToken);
+    // Load all 3 fixture files and merge their All_Fixtures sheets
+    fixSheets = {};
+    let totalRows = 0;
+    let loadedCount = 0;
+    let lastModified = '';
+    const errors = [];
 
-    if (!result) {
-      driveFixStatus('Upcoming_Fixtures.xlsx not found — run fixturesUpdate() in Apps Script', 'err');
-      log('Drive fixtures: file not found in folder', 'err');
+    for (const filename of DRIVE_FIX_FILES) {
+      try {
+        log(`Drive fixtures: fetching ${filename}...`);
+        const result = await driveDownloadFile(filename, driveAccessToken);
+        if (!result) {
+          log(`Drive fixtures: ${filename} not found — skipping`, 'err');
+          continue;
+        }
+        // Read the All_Fixtures sheet (case-insensitive fallback to first sheet)
+        const sheetKey = Object.keys(result.sheets).find(
+          k => k.toLowerCase().replace(/[\s_]/g,'') === 'allfixtures'
+        ) || Object.keys(result.sheets)[0];
+
+        if (!sheetKey) {
+          log(`Drive fixtures: ${filename} has no sheets — skipping`, 'err');
+          continue;
+        }
+
+        const rows = result.sheets[sheetKey];
+        const key = filename.replace('.xlsx','') + '::All_Fixtures';
+        fixSheets[key] = rows;
+        totalRows += rows.length;
+        loadedCount++;
+        lastModified = result.modified;
+        log(`OK Drive fixtures: ${filename} > ${rows.length} rows (updated ${result.modified})`, 'ok');
+      } catch (e) {
+        errors.push(filename);
+        log(`Drive fixtures error — ${filename}: ${e.message}`, 'err');
+      }
+    }
+
+    if (loadedCount === 0) {
+      driveFixStatus('No fixture files found in Drive folder', 'err');
+      log('Drive fixtures: no files loaded', 'err');
       if (btn) btn.disabled = false;
       return;
     }
 
-    // Load into fixSheets — merge all sheets
-    fixSheets = {};
-    let totalRows = 0;
-    for (const [sh, rows] of Object.entries(result.sheets)) {
-      fixSheets[sh] = rows;
-      totalRows += rows.length;
-    }
-
-    driveFixStatus(`✓ ${totalRows} fixture${totalRows!==1?'s':''} loaded (updated ${result.modified})`, 'ok');
-    log(`✓ Drive fixtures: ${totalRows} upcoming fixtures loaded from ${Object.keys(fixSheets).length} sheet(s)`, 'ok');
+    driveFixStatus(`OK ${totalRows} fixture${totalRows!==1?'s':''} loaded from ${loadedCount} file${loadedCount!==1?'s':''} (updated ${lastModified})`, 'ok');
+    log(`OK Drive fixtures: ${totalRows} upcoming fixtures from ${loadedCount} file(s)`, 'ok');
 
     // Update the fixtures panel UI
     const stB = document.getElementById('stB');
-    if (stB) stB.textContent = `Drive · ${totalRows} fixtures · ${result.modified}`;
+    if (stB) stB.textContent = `Drive · ${totalRows} fixtures · ${lastModified}`;
     const cardB = document.getElementById('cardB');
     if (cardB) cardB.classList.add('active');
 
