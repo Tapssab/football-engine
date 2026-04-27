@@ -985,19 +985,42 @@ function driveFixStatus(msg, type) {
   el.className = 'drive-status ' + type;
 }
 
+// ── Helper: list all xlsx files in the Drive folder (cached) ─────────
+let _driveFolderCache = null;
+async function driveFolderList(token) {
+  if (_driveFolderCache) return _driveFolderCache;
+  // Fetch all xlsx files in the folder (handles pagination up to 1000 files)
+  let allFiles = [];
+  let pageToken = '';
+  do {
+    const q = encodeURIComponent(`'${DRIVE_FOLDER_ID}' in parents and trashed=false and mimeType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'`);
+    const pt = pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : '';
+    const url = `https://www.googleapis.com/drive/v3/files?q=${q}&fields=nextPageToken,files(id,name,modifiedTime)&pageSize=1000${pt}`;
+    const res = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
+    const data = await res.json();
+    if (data.error) throw new Error(`Drive API: ${JSON.stringify(data.error)}`);
+    allFiles = allFiles.concat(data.files || []);
+    pageToken = data.nextPageToken || '';
+  } while (pageToken);
+  log(`Drive: found ${allFiles.length} xlsx file(s) in folder`);
+  _driveFolderCache = allFiles;
+  return allFiles;
+}
+
 // ── Helper: search + download one file from Drive ──────────────────
 async function driveDownloadFile(filename, token) {
-  const searchUrl = `https://www.googleapis.com/drive/v3/files?q=name='${filename}'+and+'${DRIVE_FOLDER_ID}'+in+parents+and+trashed=false&fields=files(id,name,modifiedTime)`;
-  const searchRes = await fetch(searchUrl, { headers: { Authorization: 'Bearer ' + token } });
-  const searchData = await searchRes.json();
+  const files = await driveFolderList(token);
+  // Match by exact name (case-insensitive fallback)
+  const match = files.find(f => f.name === filename)
+             || files.find(f => f.name.toLowerCase() === filename.toLowerCase());
+  if (!match) {
+    // Log available files on first miss to aid debugging
+    if (files.length > 0) log(`Drive: available files — ${files.map(f=>f.name).join(', ')}`);
+    return null;
+  }
 
-  if (searchData.error) throw new Error(`Drive API: ${JSON.stringify(searchData.error)}`);
-  if (!searchData.files || searchData.files.length === 0) return null; // not found
-
-  const fileId = searchData.files[0].id;
-  const modified = new Date(searchData.files[0].modifiedTime).toLocaleDateString();
-
-  const dlRes = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+  const modified = new Date(match.modifiedTime).toLocaleDateString();
+  const dlRes = await fetch(`https://www.googleapis.com/drive/v3/files/${match.id}?alt=media`, {
     headers: { Authorization: 'Bearer ' + token }
   });
   if (!dlRes.ok) throw new Error(`Download failed: HTTP ${dlRes.status}`);
@@ -1022,6 +1045,7 @@ async function loadFromDrive() {
       await loadScript('https://accounts.google.com/gsi/client');
     }
     driveAccessToken = await getGoogleAccessToken();
+    _driveFolderCache = null; // clear cache on new sign-in
     driveStatus('Connected — fetching historical files…', 'loading');
 
     let loaded = 0;
@@ -1085,6 +1109,7 @@ async function loadFixturesFromDrive(needsSignIn = true) {
       }
       if (!driveAccessToken) {
         driveAccessToken = await getGoogleAccessToken();
+        _driveFolderCache = null; // clear cache on new sign-in
       }
     }
 
