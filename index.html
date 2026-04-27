@@ -953,12 +953,11 @@ img,video,svg{max-width:100%;height:auto}
 const DRIVE_FOLDER_ID = '1FSKEeRH22QXiPPNZ6FmTtC1yuQqKkCtK';
 
 // Historical results files — loaded into histSheets
-// Script 1 files
 const DRIVE_HIST_FILES = [
-  'Europe 1.xlsx',        // England, Spain, Germany, Italy
-  'Europe 2.xlsx',        // Europe Part 2
-  'Europe 3.xlsx',        // Europe Part 3
-  'The Americas.xlsx',    // USA, Brazil, Argentina, etc.
+  'Europe_1.xlsx',        // England, Spain, Germany, Italy
+  'Europe_2.xlsx',        // Europe Part 2
+  'Europe_3.xlsx',        // Europe Part 3
+  'The_Americas.xlsx',    // USA, Brazil, Argentina, etc.
   'Africa.xlsx',          // African Leagues
   'Asia_ME_CIS.xlsx',     // Asia, Middle East, CIS, etc.
   'International.xlsx',   // International Competitions
@@ -966,9 +965,9 @@ const DRIVE_HIST_FILES = [
 
 // Fixtures files — 3 separate files, each with an "All_Fixtures" sheet
 const DRIVE_FIX_FILES = [
-  'fixtures 1.xlsx',
-  'fixtures 2.xlsx',
-  'fixtures 3.xlsx',
+  'fixtures_1.xlsx',
+  'fixtures_2.xlsx',
+  'fixtures_3.xlsx',
 ];
 
 let driveAccessToken = null;
@@ -1409,11 +1408,11 @@ let allRows = [], visRows = [], loadedFiles = [];
 // ═══════════════════════════════════════════════
 // COLUMN DETECTION
 // ═══════════════════════════════════════════════
-const C_HOME=['HomeTeam','Home Team','home_team','hometeam','home','Home','HT','h team'];
-const C_AWAY=['AwayTeam','Away Team','away_team','awayteam','away','Away','AT','a team'];
-const C_FTHG=['FTHG','fthg','HomeGoals','HG','Home Goals','Score H','GF','home goals'];
-const C_FTAG=['FTAG','ftag','AwayGoals','AG','Away Goals','Score A','GA','away goals'];
-const C_DATE=['Date','date','DATE','MatchDate','match_date'];
+const C_HOME=['HomeTeam','Home Team','home_team','hometeam','home','Home','HT','h team','home team'];
+const C_AWAY=['AwayTeam','Away Team','away_team','awayteam','away','Away','AT','a team','away team'];
+const C_FTHG=['FTHG','fthg','HomeGoals','HG','Home Goals','Score H','GF','home goals','home ft goal','home ft goals','homeftgoal','homeftgoals'];
+const C_FTAG=['FTAG','ftag','AwayGoals','AG','Away Goals','Score A','GA','away goals','away ft goal','away ft goals','awayftgoal','awayftgoals'];
+const C_DATE=['Date','date','DATE','MatchDate','match_date','kick off','kickoff','kick_off','KickOff','Kick Off'];
 const DIV={E0:'Premier League',E1:'Championship',E2:'League One',E3:'League Two',EC:'National League',SC0:'Scottish Prem',SC1:'Scottish Champ',SC2:'Scottish L1',SC3:'Scottish L2',D1:'Bundesliga',D2:'Bundesliga 2',SP1:'La Liga',SP2:'La Liga 2',I1:'Serie A',I2:'Serie B',F1:'Ligue 1',F2:'Ligue 2',B1:'Belgian Pro',N1:'Eredivisie',P1:'Primeira Liga',T1:'Süper Lig',G1:'Super League GR'};
 const divName=s=>DIV[s]||s;
 
@@ -1441,7 +1440,10 @@ function buildMasterIndex(sheets){
     const c=getCols(rows,C_HOME,C_AWAY,null,null);
     if(!c||(!c.home&&!c.away))continue;
     const dateCol=findCol(rows[0],C_DATE);
+    const statusCol=Object.keys(rows[0]).find(k=>k.toLowerCase().replace(/[\s_]/g,'') === 'status') || null;
     for(const r of rows){
+      // Only index teams from finished matches
+      if(statusCol){const st=String(r[statusCol]||'').trim().toUpperCase();if(st&&st!=='FT'&&st!=='AET'&&st!=='PEN')continue;}
       // Only index teams from current season
       const dt=dateCol?String(r[dateCol]||'').trim():'';
       if(dt && !isCurrentSeason(dt)) continue;
@@ -1469,6 +1471,9 @@ const SEASON_START = new Date('2025-07-01'); // 1 July 2025 — covers all 2025/
 function parseMatchDate(str) {
   if (!str || !str.trim()) return null;
   const s = str.trim();
+
+  // ISO 8601 datetime: YYYY-MM-DDTHH:MM:SS+TZ (e.g. 2026-04-28T18:45:00+00:00)
+  if (/^\d{4}-\d{2}-\d{2}T/.test(s)) return new Date(s);
 
   // DD/MM/YY — 2-digit year: always treat as DD/MM (football-data.co.uk standard)
   let m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})$/);
@@ -1514,8 +1519,12 @@ function buildMatchStore(sheets,idx){
     if(!rows.length)continue;
     const c=getCols(rows,C_HOME,C_AWAY,C_FTHG,C_FTAG);
     if(!c||!c.home||!c.away||!c.fthg||!c.ftag)continue;
+    // Detect status column to skip unfinished matches (NS, PPD, POSTP, etc.)
+    const cStatus = Object.keys(rows[0]).find(k=>k.toLowerCase().replace(/[\s_]/g,'') === 'status') || null;
     for(const r of rows){
       const hR=String(r[c.home]||'').trim(),aR=String(r[c.away]||'').trim();
+      // Skip non-finished matches
+      if(cStatus){const st=String(r[cStatus]||'').trim().toUpperCase();if(st&&st!=='FT'&&st!=='AET'&&st!=='PEN')continue;}
       const hg=parseFloat(r[c.fthg]),ag=parseFloat(r[c.ftag]);
       if(!hR||!aR||isNaN(hg)||isNaN(ag))continue;
       const hC=fuzzy(hR,idx),aC=fuzzy(aR,idx);
@@ -2983,8 +2992,8 @@ document.getElementById('runBtn').addEventListener('click',async()=>{
       const valid=rows.filter(r=>{const h=String(r[c.home]||'').trim(),a=String(r[c.away]||'').trim();return h&&h!=='undefined'&&a&&a!=='undefined';});
       log(`"${sh}": ${valid.length} fixture(s)`);
       // detect extra columns from Drive fixtures file
-      const c_kickoff = Object.keys(rows[0]).find(k=>k.toLowerCase().replace(/[\s_]/g,'') === 'kickoffutc') || null;
-      const c_date    = Object.keys(rows[0]).find(k=>k.toLowerCase() === 'date') || null;
+      const c_kickoff = Object.keys(rows[0]).find(k=>['kickoffutc','kickoff','kick off','kick_off'].includes(k.toLowerCase())) || null;
+      const c_date    = Object.keys(rows[0]).find(k=>['date','kick off','kickoff','kick_off'].includes(k.toLowerCase())) || null;
       const c_round   = Object.keys(rows[0]).find(k=>k.toLowerCase() === 'round') || null;
       const c_league  = Object.keys(rows[0]).find(k=>k.toLowerCase() === 'league') || null;
       const c_country = Object.keys(rows[0]).find(k=>k.toLowerCase() === 'country') || null;
