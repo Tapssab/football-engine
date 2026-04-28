@@ -985,47 +985,61 @@ function driveFixStatus(msg, type) {
   el.className = 'drive-status ' + type;
 }
 
-// ── Helper: list all xlsx files in the Drive folder (cached) ─────────
+// ── Helper: list ALL files in the Drive folder — no MIME filter (cached) ──
 let _driveFolderCache = null;
 async function driveFolderList(token) {
   if (_driveFolderCache) return _driveFolderCache;
-  // Fetch all xlsx files in the folder (handles pagination up to 1000 files)
   let allFiles = [];
   let pageToken = '';
+  // No mimeType filter — catch xlsx, Google Sheets, any format Apps Script may have created
   do {
-    const q = encodeURIComponent(`'${DRIVE_FOLDER_ID}' in parents and trashed=false and mimeType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'`);
+    const q = encodeURIComponent(`'${DRIVE_FOLDER_ID}' in parents and trashed=false`);
     const pt = pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : '';
-    const url = `https://www.googleapis.com/drive/v3/files?q=${q}&fields=nextPageToken,files(id,name,modifiedTime)&pageSize=1000${pt}`;
+    const url = `https://www.googleapis.com/drive/v3/files?q=${q}&fields=nextPageToken,files(id,name,mimeType,modifiedTime)&pageSize=1000${pt}`;
     const res = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
     const data = await res.json();
     if (data.error) throw new Error(`Drive API: ${JSON.stringify(data.error)}`);
     allFiles = allFiles.concat(data.files || []);
     pageToken = data.nextPageToken || '';
   } while (pageToken);
-  log(`Drive: found ${allFiles.length} xlsx file(s) in folder`);
+  const names = allFiles.map(f => `${f.name} [${f.mimeType.split('.').pop().split(';')[0]}]`).join(', ');
+  log(`Drive folder contents (${allFiles.length} files): ${names || '(empty)'}`);
   _driveFolderCache = allFiles;
   return allFiles;
 }
 
-// ── Helper: search + download one file from Drive ──────────────────
+// ── Helper: download one file from Drive, handling both xlsx and Google Sheets ──
 async function driveDownloadFile(filename, token) {
   const files = await driveFolderList(token);
-  // Match by exact name (case-insensitive fallback)
+  const base = filename.replace(/\.xlsx$/i, '');
+
+  // Match: exact name, then case-insensitive, then base name without extension
   const match = files.find(f => f.name === filename)
-             || files.find(f => f.name.toLowerCase() === filename.toLowerCase());
-  if (!match) {
-    // Log available files on first miss to aid debugging
-    if (files.length > 0) log(`Drive: available files — ${files.map(f=>f.name).join(', ')}`);
-    return null;
+             || files.find(f => f.name.toLowerCase() === filename.toLowerCase())
+             || files.find(f => f.name.replace(/\.xlsx$/i,'').toLowerCase() === base.toLowerCase())
+             || files.find(f => f.name.toLowerCase().replace(/[_\s]/g,'') === base.toLowerCase().replace(/[_\s]/g,''));
+
+  if (!match) return null;
+
+  const isGSheet = match.mimeType === 'application/vnd.google-apps.spreadsheet';
+  let arrayBuffer;
+  const modified = new Date(match.modifiedTime).toLocaleDateString();
+
+  if (isGSheet) {
+    // Export Google Sheet as xlsx
+    const exportUrl = `https://www.googleapis.com/drive/v3/files/${match.id}/export?mimeType=application%2Fvnd.openxmlformats-officedocument.spreadsheetml.sheet`;
+    const res = await fetch(exportUrl, { headers: { Authorization: 'Bearer ' + token } });
+    if (!res.ok) throw new Error(`Export failed: HTTP ${res.status}`);
+    arrayBuffer = await res.arrayBuffer();
+  } else {
+    // Download raw file (xlsx, csv, etc.)
+    const res = await fetch(`https://www.googleapis.com/drive/v3/files/${match.id}?alt=media`, {
+      headers: { Authorization: 'Bearer ' + token }
+    });
+    if (!res.ok) throw new Error(`Download failed: HTTP ${res.status}`);
+    arrayBuffer = await res.arrayBuffer();
   }
 
-  const modified = new Date(match.modifiedTime).toLocaleDateString();
-  const dlRes = await fetch(`https://www.googleapis.com/drive/v3/files/${match.id}?alt=media`, {
-    headers: { Authorization: 'Bearer ' + token }
-  });
-  if (!dlRes.ok) throw new Error(`Download failed: HTTP ${dlRes.status}`);
-
-  const arrayBuffer = await dlRes.arrayBuffer();
   const wb = XLSX.read(arrayBuffer, { type: 'array' });
   const sheets = {};
   for (const n of wb.SheetNames) {
@@ -1085,7 +1099,14 @@ async function loadFromDrive() {
       // Auto-load fixtures after history is ready
       await loadFixturesFromDrive(false);
     } else {
-      driveStatus('No history files found — run Apps Script bulk download first', 'err');
+      // Show exactly what files ARE in the folder to help diagnose name mismatches
+      const folderFiles = _driveFolderCache || [];
+      const foundNames = folderFiles.length
+        ? `Files in folder: ${folderFiles.map(f=>f.name).join(', ')}`
+        : 'Folder appears empty or folder ID may be wrong';
+      driveStatus('No history files found — check log for details', 'err');
+      log('No history files matched. Expected: ' + DRIVE_HIST_FILES.join(', '), 'err');
+      log(foundNames, 'err');
     }
 
   } catch (e) {
