@@ -889,8 +889,8 @@ img,video,svg{max-width:100%;height:auto}
                 <div class="fp-fg"><label>Home λ ≤</label><input type="number" id="fHlamMax" step="0.1" min="0" placeholder="max"></div>
                 <div class="fp-fg"><label>Away λ ≥</label><input type="number" id="fAlam" step="0.1" min="0" placeholder="min"></div>
                 <div class="fp-fg"><label>Away λ ≤</label><input type="number" id="fAlamMax" step="0.1" min="0" placeholder="max"></div>
-                <div class="fp-fg"><label>Home CS ≥</label><input type="number" id="fHcs" min="0" placeholder="0"></div>
-                <div class="fp-fg"><label>Away CS ≥</label><input type="number" id="fAcs" min="0" placeholder="0"></div>
+                <div class="fp-fg"><label>Home CS ≤</label><input type="number" id="fHcs" min="0" placeholder="max"></div>
+                <div class="fp-fg"><label>Away CS ≤</label><input type="number" id="fAcs" min="0" placeholder="max"></div>
                 <div class="fp-fg fp-full"><label>Form Diff (any direction) ≥</label><input type="number" id="fFormDiff" step="1" min="0" max="100" placeholder="e.g. 30"></div>
                 <div class="fp-fg"><label>Match BTTS % ≥</label><input type="number" id="fMbtts" step="1" min="0" max="100" placeholder="min"></div>
                 <div class="fp-fg"><label>Match BTTS % ≤</label><input type="number" id="fMbttsMax" step="1" min="0" max="100" placeholder="max"></div>
@@ -1293,6 +1293,21 @@ function saveSettings() {
     cGamma:       document.getElementById('cGamma').value,
     cDelta:       document.getElementById('cDelta').value,
     confFilter:   document.getElementById('fConf').value,
+    // Filter preferences
+    fLeague:      document.getElementById('fLeague').value,
+    fSearch:      document.getElementById('fSearch').value,
+    fQuality:     document.getElementById('fQuality').value,
+    fHlam:        document.getElementById('fHlam').value,
+    fHlamMax:     document.getElementById('fHlamMax').value,
+    fAlam:        document.getElementById('fAlam').value,
+    fAlamMax:     document.getElementById('fAlamMax').value,
+    fHcs:         document.getElementById('fHcs').value,
+    fAcs:         document.getElementById('fAcs').value,
+    fFormDiff:    document.getElementById('fFormDiff').value,
+    fMbtts:       document.getElementById('fMbtts').value,
+    fMbttsMax:    document.getElementById('fMbttsMax').value,
+    fConservSig:  document.getElementById('fConservSig').value,
+    sortSel:      document.getElementById('sortSel').value,
     savedAt:      new Date().toLocaleString()
   };
   try {
@@ -1339,6 +1354,23 @@ function loadSettings() {
 
     // Confidence filter
     if (s.confFilter !== undefined) document.getElementById('fConf').value = s.confFilter;
+
+    // Filter preferences
+    if (s.fQuality   !== undefined) document.getElementById('fQuality').value   = s.fQuality;
+    if (s.fSearch    !== undefined) document.getElementById('fSearch').value     = s.fSearch;
+    if (s.fHlam      !== undefined) document.getElementById('fHlam').value       = s.fHlam;
+    if (s.fHlamMax   !== undefined) document.getElementById('fHlamMax').value    = s.fHlamMax;
+    if (s.fAlam      !== undefined) document.getElementById('fAlam').value       = s.fAlam;
+    if (s.fAlamMax   !== undefined) document.getElementById('fAlamMax').value    = s.fAlamMax;
+    if (s.fHcs       !== undefined) document.getElementById('fHcs').value        = s.fHcs;
+    if (s.fAcs       !== undefined) document.getElementById('fAcs').value        = s.fAcs;
+    if (s.fFormDiff  !== undefined) document.getElementById('fFormDiff').value   = s.fFormDiff;
+    if (s.fMbtts     !== undefined) document.getElementById('fMbtts').value      = s.fMbtts;
+    if (s.fMbttsMax  !== undefined) document.getElementById('fMbttsMax').value   = s.fMbttsMax;
+    if (s.fConservSig !== undefined) document.getElementById('fConservSig').value = s.fConservSig;
+    if (s.sortSel    !== undefined) document.getElementById('sortSel').value     = s.sortSel;
+    // Note: fLeague is populated dynamically after analysis runs, so we store and restore it after fillLeagueSelect
+    if (s.fLeague    !== undefined) window._savedLeagueFilter = s.fLeague;
 
     // Refresh all weight display labels
     onWeightChange();
@@ -3142,8 +3174,8 @@ function applyFilters(){
     if(f.qual==='low'&&!H.low&&!A.low)return false;
     if(f.qual==='found'&&(!H.found||!A.found))return false;
     if(f.qual==='missing'&&H.found&&A.found)return false;
-    if(H.found){if(!isNaN(f.hLam)&&H.lS<f.hLam)return false;if(!isNaN(f.hLamMax)&&H.lS>f.hLamMax)return false;if(!isNaN(f.hCS)&&H.cs<f.hCS)return false;}
-    if(A.found){if(!isNaN(f.aLam)&&A.lS<f.aLam)return false;if(!isNaN(f.aLamMax)&&A.lS>f.aLamMax)return false;if(!isNaN(f.aCS)&&A.cs<f.aCS)return false;}
+    if(H.found){if(!isNaN(f.hLam)&&H.lS<f.hLam)return false;if(!isNaN(f.hLamMax)&&H.lS>f.hLamMax)return false;if(!isNaN(f.hCS)&&H.cs>f.hCS)return false;}
+    if(A.found){if(!isNaN(f.aLam)&&A.lS<f.aLam)return false;if(!isNaN(f.aLamMax)&&A.lS>f.aLamMax)return false;if(!isNaN(f.aCS)&&A.cs>f.aCS)return false;}
     if(!isNaN(f.formDiffMin)&&(r.formDiff===null||Math.abs(r.formDiff)<f.formDiffMin))return false;
     if(!isNaN(f.minConf)&&(ensMode!=='ensemble'||!r.conf||r.conf.pct<f.minConf))return false;
     if(f.conservSig&&r.conservSig&&r.conservSig.sig!==f.conservSig)return false;
@@ -3197,6 +3229,11 @@ function fillLeagueSelect(rows){
   const ls=[...new Set(rows.map(r=>r.league))].sort();
   sel.innerHTML='<option value="">All Leagues</option>';
   ls.forEach(l=>{const o=document.createElement('option');o.value=l;o.textContent=l;sel.appendChild(o);});
+  // Restore saved league filter if present
+  if (window._savedLeagueFilter) {
+    sel.value = window._savedLeagueFilter;
+    window._savedLeagueFilter = null;
+  }
 }
 
 // ═══════════════════════════════════════════════
