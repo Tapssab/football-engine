@@ -1624,6 +1624,32 @@ function buildMatchStore(sheets,idx){
       if (!db) return  1;
       return da - db;
     });
+
+    // Deduplicate: if the same match appears in multiple loaded sheets,
+    // it will have been pushed multiple times. Remove duplicates by
+    // comparing (date, opponent, venue, scored, conceded).
+    // When dates differ slightly in format, also match by (opponent, venue, scored, conceded)
+    // within a 3-day window to catch cross-file duplicates with date format mismatches.
+    const seen = [];
+    store[k] = store[k].filter(m => {
+      const mDate = parseMatchDate(m.date);
+      const opp = (m.opponent || '').toLowerCase().trim();
+      const isDup = seen.some(s => {
+        // Exact key match
+        if (s.opponent === opp && s.venue === m.venue &&
+            s.scored === m.scored && s.conceded === m.conceded) {
+          if (s.date === m.date) return true;           // identical date string
+          const sd = parseMatchDate(s.date);
+          if (mDate && sd) {
+            const diff = Math.abs(mDate - sd) / 864e5;  // difference in days
+            if (diff <= 3) return true;                  // same match, different date format
+          }
+        }
+        return false;
+      });
+      if (!isDup) seen.push({ date: m.date, opponent: opp, venue: m.venue, scored: m.scored, conceded: m.conceded });
+      return !isDup;
+    });
   }
   return store;
 }
