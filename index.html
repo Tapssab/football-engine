@@ -1628,24 +1628,24 @@ function buildMatchStore(sheets,idx){
     // Deduplicate: if the same match appears in multiple loaded sheets,
     // it will have been pushed multiple times. Remove duplicates by
     // comparing (date, opponent, venue, scored, conceded).
-    // When dates differ slightly in format, also match by (opponent, venue, scored, conceded)
-    // within a 3-day window to catch cross-file duplicates with date format mismatches.
+    // Date must match exactly or within 1 day (to tolerate date-format mismatches
+    // across files). A 2+ day gap always means a different match, even if the
+    // opponent, venue, and score happen to be identical (e.g. back-to-back fixtures).
     const seen = [];
     store[k] = store[k].filter(m => {
       const mDate = parseMatchDate(m.date);
       const opp = (m.opponent || '').toLowerCase().trim();
       const isDup = seen.some(s => {
-        // Exact key match
-        if (s.opponent === opp && s.venue === m.venue &&
-            s.scored === m.scored && s.conceded === m.conceded) {
-          if (s.date === m.date) return true;           // identical date string
-          const sd = parseMatchDate(s.date);
-          if (mDate && sd) {
-            const diff = Math.abs(mDate - sd) / 864e5;  // difference in days
-            if (diff <= 3) return true;                  // same match, different date format
-          }
+        // Dates must be close first — this is the primary guard
+        const sd = parseMatchDate(s.date);
+        const dateDiff = (mDate && sd) ? Math.abs(mDate - sd) / 864e5 : null;
+        if (s.date !== m.date) {
+          // If we can parse both dates, require them to be within 1 day
+          if (dateDiff === null || dateDiff > 1) return false;
         }
-        return false;
+        // Dates match (exact string or ≤1 day apart) — now check match identity
+        return s.opponent === opp && s.venue === m.venue &&
+               s.scored === m.scored && s.conceded === m.conceded;
       });
       if (!isDup) seen.push({ date: m.date, opponent: opp, venue: m.venue, scored: m.scored, conceded: m.conceded });
       return !isDup;
