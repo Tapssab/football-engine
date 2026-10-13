@@ -451,7 +451,7 @@ table.ftable tbody tr.hot td:first-child{box-shadow:inset 2px 0 0 var(--accent)}
 .bt-ct{font-size:.55rem;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:6px}
 .bt-cv{font-family:var(--mono);font-size:1.5rem;font-weight:700;color:var(--t1)}
 .bt-cs{font-size:.62rem;color:var(--t2);margin-top:5px;line-height:1.5}
-#btOut .good{color:#4ade80}#btOut .bad{color:var(--a2)}
+#btOut .good{color:#4ade80}#btOut .bad,.bad{color:var(--a2)}
 .bt-sec{font-size:.8rem;font-weight:700;margin-top:10px;letter-spacing:.2px}
 .bt-note{font-size:.68rem;color:var(--t2);line-height:1.6;max-width:900px}
 .bt-note b{color:var(--t1)}
@@ -767,7 +767,7 @@ table.ftable tbody tr.hot td:first-child{box-shadow:inset 2px 0 0 var(--accent)}
                 <div class="fp-fg fp-full"><label>Form Diff (any direction) ≥</label><input type="number" id="fFormDiff" step="1" min="0" max="100" placeholder="e.g. 30"></div>
                 <div class="fp-fg"><label>Match BTTS % ≥</label><input type="number" id="fMbtts" step="1" min="0" max="100" placeholder="min"></div>
                 <div class="fp-fg"><label>Match BTTS % ≤</label><input type="number" id="fMbttsMax" step="1" min="0" max="100" placeholder="max"></div>
-                <div class="fp-fg fp-full"><label>Confidence % ≥ <span style="font-size:.48rem;color:var(--accent)">(Ensemble mode)</span></label><input type="number" id="fConf" step="1" min="0" max="100" value="60" placeholder="e.g. 60"></div>
+                <div class="fp-fg fp-full"><label>Confidence % ≥ <span style="font-size:.48rem;color:var(--accent)">(Ensemble mode)</span></label><input type="number" id="fConf" step="1" min="0" max="100" value="" placeholder="e.g. 60"></div>
                 <div class="fp-fg fp-full"><label>C-Signal <span style="font-size:.48rem;color:#e0c97f">(Conservative O/U)</span></label><select id="fConservSig"><option value="">All</option><option value="over">Strong Over</option><option value="under">Strong Under</option><option value="none">No Edge</option></select></div>
                 <button class="fp-reset" id="resetBtn">✕ Reset Filters</button>
               </div>
@@ -2919,7 +2919,7 @@ function applyFilters(){
     if(H.found){if(!isNaN(f.hLam)&&H.lS<f.hLam)return false;if(!isNaN(f.hLamMax)&&H.lS>f.hLamMax)return false;if(!isNaN(f.hCS)&&H.cs<f.hCS)return false;}
     if(A.found){if(!isNaN(f.aLam)&&A.lS<f.aLam)return false;if(!isNaN(f.aLamMax)&&A.lS>f.aLamMax)return false;if(!isNaN(f.aCS)&&A.cs<f.aCS)return false;}
     if(!isNaN(f.formDiffMin)&&(r.formDiff===null||Math.abs(r.formDiff)<f.formDiffMin))return false;
-    if(!isNaN(f.minConf)&&(ensMode!=='ensemble'||!r.conf||r.conf.pct<f.minConf))return false;
+    if(!isNaN(f.minConf)&&ensMode==='ensemble'&&(!r.conf||r.conf.pct<f.minConf))return false;
     if(f.conservSig&&r.conservSig&&r.conservSig.sig!==f.conservSig)return false;
     if(r.mBTTS!==null&&!isNaN(f.mBT)&&r.mBTTS*100<f.mBT)return false;
     if(r.mBTTS!==null&&!isNaN(f.mBTMax)&&r.mBTTS*100>f.mBTMax)return false;
@@ -2937,7 +2937,7 @@ function applyFilters(){
     const dd=document.getElementById('sortSel').value;
     if(dd){visRows.sort((x,y)=>{switch(dd){case'kickoff-a':return(x.kickoff||x.date||'').localeCompare(y.kickoff||y.date||'');case'kickoff-d':return(y.kickoff||y.date||'').localeCompare(x.kickoff||x.date||'');case'btts-d':return(y.mBTTS||0)-(x.mBTTS||0);case'btts-a':return(x.mBTTS||0)-(y.mBTTS||0);case'form-d':return(y.formDiff||0)-(x.formDiff||0);case'hform-d':return(y.H.form||0)-(x.H.form||0);case'hlam-d':return(y.H.lS||0)-(x.H.lS||0);case'ens-d':return(y.ensBTTS||0)-(x.ensBTTS||0);case'conf-d':return(y.conf?y.conf.score:0)-(x.conf?x.conf.score:0);case'over35-d':return(y.conservOU?y.conservOU.over35:0)-(x.conservOU?x.conservOU.over35:0);case'under15-d':return(y.conservOU?y.conservOU.under15:0)-(x.conservOU?x.conservOU.under15:0);default:return 0;}})}
   }
-  document.getElementById('resCount').textContent=`Showing ${visRows.length} of ${allRows.length} fixtures`;
+  document.getElementById('resCount').textContent=`Showing ${visRows.length} of ${allRows.length} fixtures`+(visRows.length===0&&allRows.length>0?' - filters are hiding everything: open Filters and press Reset':'');
   renderTable(visRows);
 }
 
@@ -2946,7 +2946,7 @@ document.getElementById('sortSel').addEventListener('change',applyFilters);
 document.getElementById('resetBtn').addEventListener('click',()=>{
   F_IDS.forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
   document.getElementById('fQuality').value='found';
-  document.getElementById('fConf').value='60';
+  document.getElementById('fConf').value='';
   applyFilters();
 });
 document.getElementById('fToggleBtn').addEventListener('click',e=>{
@@ -3765,7 +3765,7 @@ function parseBuffer(buf,name,folder){
 }
 async function loadDrive(){
   const st=$('btDriveStatus'), btn=$('btDriveBtn'); btn.disabled=true;
-  const set=(m,c)=>{ st.textContent=m; st.className='drive-status '+(c||''); };
+  const set=(m,c)=>{ st.textContent=m; st.className='drive-status '+(c||''); BT.msg={text:m,cls:c||''}; if(!BT.recs) renderOut(); };
   try{
     let folder=$('btFolderId').value.trim(); const mm=folder.match(/folders\/([\w-]+)/); if(mm) folder=mm[1];
     if(!folder){ set('Enter the Drive folder ID','err'); btn.disabled=false; return; }
@@ -3786,7 +3786,9 @@ async function loadDrive(){
     }
     if(!files){ set('No spreadsheet files found in that folder (or all were skipped)','err'); btn.disabled=false; return; }
     finalize(); set('Loaded '+BT.matches.length.toLocaleString()+' games from '+files+' files'+(empty.length?' ('+empty.length+' had no usable results: '+empty.slice(0,3).join(', ')+(empty.length>3?'...':'')+')':''),'ok');
-  }catch(e){ set('Failed: '+e.message,'err'); }
+    if(BT.leagues.length){ btn.disabled=false; await run(); return; }
+    set('Files were read but no finished games with scores were found. Files in folder: '+list.map(f=>f.name).join(', '),'err');
+  }catch(e){ console.warn(e); set('Failed: '+e.message,'err'); }
   btn.disabled=false;
 }
 async function loadLocal(fileList){
@@ -3860,8 +3862,10 @@ function calSvg(b,title){
 function renderOut(){
   const el=$('btOut'); if(!el) return;
   if(!BT.recs){
-    el.innerHTML='<div class="empty"><div class="empty-icon">&#9878;</div><div class="empty-title">'+(BT.leagues.length?'Ready to backtest':'No data yet')+'</div><div class="empty-sub">'+
-      (BT.leagues.length?'Choose the seasons and settings on the left, then press Run Backtest.':'Load last season and current season from Google Drive (or drop CSV/XLSX files) using the buttons on the left.')+'</div></div>'; return; }
+    const m=BT.msg, busy=m&&m.cls==='loading';
+    el.innerHTML='<div class="empty"><div class="empty-icon">&#9878;</div><div class="empty-title">'+(busy?'Working...':BT.leagues.length?'Ready to backtest':(m&&m.cls==='err'?'Could not load data':'No data yet'))+'</div><div class="empty-sub">'+
+      (m&&m.text?'<b class="'+(m.cls==='err'?'bad':'')+'">'+m.text.replace(/</g,'&lt;')+'</b><br><br>':'')+
+      (BT.leagues.length?'Choose the seasons and settings on the left, then press Run Backtest.':'Press "Load from Google Drive" on the left (sign in when asked), or add CSV/XLSX files.')+'</div></div>'; return; }
   const ev=evaluate(BT.recs,postCfg()); BT.ev=ev;
   if(!ev.n){ el.innerHTML='<div class="empty"><div class="empty-title">No games could be predicted</div><div class="empty-sub">Try a smaller warm-up value, or check the data covers the selected season.</div></div>'; return; }
   const b=ev.btts,x=ev.x12,o=ev.ou25;
@@ -3961,6 +3965,7 @@ window.showPage=function(p){
   $('predApp').style.display=bt?'none':''; $('btApp').style.display=bt?'':'none';
   $('tabPred').classList.toggle('active',!bt); $('tabBt').classList.toggle('active',bt);
   if(bt&&!BT._init){ BT._init=true; copyFromPredictions(); }
+  if(bt&&!BT.leagues.length&&!BT.busy&&!BT._tried){ BT._tried=true; loadDrive(); }
 };
 function wire(){
   if(!$('btApp')) return;
