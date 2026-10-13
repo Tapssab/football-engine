@@ -880,188 +880,216 @@ table.ftable tbody tr.hot td:first-child{box-shadow:inset 2px 0 0 var(--accent)}
 // GOOGLE DRIVE LOADER  (v2 — historical + fixtures)
 // ═══════════════════════════════════════════════
 const DRIVE_FOLDER_ID = '1FSKEeRH22QXiPPNZ6FmTtC1yuQqKkCtK';
-
-// Historical results files — loaded into histSheets
-const DRIVE_HIST_FILES = [
-  'Europe_Results.xlsx',
-  'Africa_Results.xlsx',
-  'Americas_Results.xlsx',
-  'Asia_ME_CIS_Results.xlsx',
-  'International_Competitions.xlsx',
-  'Daily_Patch.xlsx',
-];
-
-// Fixtures file — loaded into fixSheets (replaces manual upload)
-const DRIVE_FIX_FILE = 'Upcoming_Fixtures.xlsx';
-
+const DRIVE_HISTORY_FOLDERS = ['Historical_LastSeason_2526', 'Live_CurrentSeason_2627'];
+const DRIVE_FIX_FOLDER = 'Upcoming_Fixtures';
+const DRIVE_SYNC_FOLDER_PREFIX = 'Sync_';
 let driveAccessToken = null;
 
 function driveStatus(msg, type) {
   const el = document.getElementById('driveStatus');
-  el.textContent = msg;
-  el.className = 'drive-status ' + type;
+  if (el) { el.textContent = msg; el.className = 'drive-status ' + type; }
 }
-
 function driveFixStatus(msg, type) {
   const el = document.getElementById('driveFixStatus');
-  if (!el) return;
-  el.textContent = msg;
-  el.className = 'drive-status ' + type;
+  if (el) { el.textContent = msg; el.className = 'drive-status ' + type; }
 }
 
-// ── Helper: search + download one file from Drive ──────────────────
-async function driveDownloadFile(filename, token) {
-  // Build a valid Drive API query. Encode the entire q expression, not pieces
-  // of it, so the folder-parent condition is parsed correctly.
-  const safeName = filename.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-  const q = `name = '${safeName}' and '${DRIVE_FOLDER_ID}' in parents and trashed = false`;
-  const searchUrl = 'https://www.googleapis.com/drive/v3/files?q=' +
-    encodeURIComponent(q) +
-    '&pageSize=100&orderBy=modifiedTime desc&fields=' +
-    encodeURIComponent('files(id,name,mimeType,modifiedTime)');
-  const searchRes = await fetch(searchUrl, { headers: { Authorization: 'Bearer ' + token } });
-  const searchData = await searchRes.json();
-
-  if (!searchRes.ok || searchData.error) {
-    throw new Error(`Drive search failed (HTTP ${searchRes.status}): ` +
-      (searchData.error?.message || JSON.stringify(searchData.error || searchData)));
+// Drive API helpers. The root folder now contains subfolders, not the data files themselves.
+async function driveApiJson(url, token) {
+  const res = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data.error) {
+    throw new Error(`Drive API failed (HTTP ${res.status}): ${data.error?.message || JSON.stringify(data)}`);
   }
-  if (!searchData.files || searchData.files.length === 0) return null; // not found
-
-  const file = searchData.files[0];
-  const fileId = file.id;
-  const modified = file.modifiedTime ? new Date(file.modifiedTime).toLocaleDateString() : 'unknown';
-
-  // Google Sheets files need the export endpoint; uploaded XLSX files use alt=media.
-  const isGoogleSheet = file.mimeType === 'application/vnd.google-apps.spreadsheet';
-  const downloadUrl = isGoogleSheet
-    ? `https://www.googleapis.com/drive/v3/files/${fileId}/export?mimeType=${encodeURIComponent('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')}`
-    : `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`;
-  const dlRes = await fetch(downloadUrl, { headers: { Authorization: 'Bearer ' + token } });
-  if (!dlRes.ok) {
-    const detail = await dlRes.text().catch(() => '');
-    throw new Error(`Download failed for ${filename} (HTTP ${dlRes.status})${detail ? ': ' + detail : ''}`);
+  return data;
+}
+async function driveListChildren(folderId, token) {
+  const q = `'${folderId}' in parents and trashed = false`;
+  const url = 'https://www.googleapis.com/drive/v3/files?q=' + encodeURIComponent(q) +
+    '&pageSize=1000&orderBy=name&fields=' + encodeURIComponent('nextPageToken,files(id,name,mimeType,modifiedTime,parents)');
+  let all = [], next = '';
+  do {
+    const pageUrl = url + (next ? '&pageToken=' + encodeURIComponent(next) : '');
+    const data = await driveApiJson(pageUrl, token);
+    all = all.concat(data.files || []);
+    next = data.nextPageToken || '';
+  } while (next);
+  return all;
+}
+async function driveGetRootFolders(token) {
+  const items = await driveListChildren(DRIVE_FOLDER_ID, token);
+  return { items, folders: items.filter(f => f.mimeType === 'application/vnd.google-apps.folder') };
+}
+function driveSupportedDataFile(file) {
+  return file && (
+    file.mimeType === 'application/vnd.google-apps.spreadsheet' ||
+    /\.(xlsx?|csv)$/i.test(file.name || '')
+  );
+}
+async function driveReadFile(file, token) {
+  const isSheet = file.mimeType === 'application/vnd.google-apps.spreadsheet';
+  const isCsv = /\.csv$/i.test(file.name || '');
+  const url = isSheet
+    ? `https://www.googleapis.com/drive/v3/files/${file.id}/export?mimeType=${encodeURIComponent('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')}`
+    : `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`;
+  const res = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => '');
+    throw new Error(`Download failed for ${file.name} (HTTP ${res.status})${detail ? ': ' + detail : ''}`);
   }
-
-  const arrayBuffer = await dlRes.arrayBuffer();
-  const wb = XLSX.read(arrayBuffer, { type: 'array' });
+  let wb;
+  if (isCsv) {
+    const csvText = await res.text();
+    wb = XLSX.read(csvText, { type: 'string' });
+  } else {
+    wb = XLSX.read(await res.arrayBuffer(), { type: 'array' });
+  }
   const sheets = {};
-  for (const n of wb.SheetNames) {
-    sheets[n] = XLSX.utils.sheet_to_json(wb.Sheets[n], { defval: '', raw: false });
+  for (const sheetName of wb.SheetNames) {
+    sheets[sheetName] = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { defval: '', raw: false });
   }
-  return { sheets, modified };
+  return {
+    sheets,
+    modified: file.modifiedTime ? new Date(file.modifiedTime).toLocaleDateString() : 'unknown'
+  };
+}
+function driveFindFolder(folders, name) {
+  return folders.find(f => f.name === name) || null;
 }
 
-// ── Main Drive load — historical results ───────────────────────────
+// Main Drive load: auto-discover all CSV/XLSX/Google Sheets in the historical
+// and current-season folders. No fixed Europe_1.xlsx-style filenames required.
 async function loadFromDrive() {
   const btn = document.getElementById('driveBtn');
-  btn.disabled = true;
+  if (btn) btn.disabled = true;
   driveStatus('Signing in to Google…', 'loading');
-
   try {
-    if (!window.google || !window.google.accounts) {
-      await loadScript('https://accounts.google.com/gsi/client');
-    }
+    if (!window.google || !window.google.accounts) await loadScript('https://accounts.google.com/gsi/client');
     driveAccessToken = await getGoogleAccessToken();
-    driveStatus('Connected — fetching historical files…', 'loading');
+    driveStatus('Connected — locating season folders…', 'loading');
 
-    let loaded = 0;
-    const errors = [];
+    const { items, folders } = await driveGetRootFolders(driveAccessToken);
+    log('Drive root folders: ' + (folders.map(f => f.name).join(', ') || '(none)'));
+    const sourceFolders = DRIVE_HISTORY_FOLDERS
+      .map(name => driveFindFolder(folders, name))
+      .filter(Boolean);
+    // Include dated sync folders too, for newly generated Global_*.xlsx or patch files.
+    // Fixture files stay in Upcoming_Fixtures and are loaded separately below.
+    sourceFolders.push(...folders.filter(f => f.name.startsWith(DRIVE_SYNC_FOLDER_PREFIX)));
 
-    for (const filename of DRIVE_HIST_FILES) {
-      try {
-        log(`Drive: fetching ${filename}…`);
-        const result = await driveDownloadFile(filename, driveAccessToken);
-        if (!result) {
-          log(`Drive: ${filename} not found in folder — skipping`, 'err');
+    if (!sourceFolders.length) {
+      const available = folders.map(f => f.name).join(', ') || '(no subfolders found)';
+      throw new Error(`Could not find ${DRIVE_HISTORY_FOLDERS.join(' or ')} under the selected Drive folder. Found: ${available}`);
+    }
+
+    let loaded = 0, filesSeen = 0;
+    const seenFileNames = new Set();
+    const missingFolders = DRIVE_HISTORY_FOLDERS.filter(name => !driveFindFolder(folders, name));
+    if (missingFolders.length) log('Drive: season folder(s) not found: ' + missingFolders.join(', '), 'err');
+
+    for (const folder of sourceFolders) {
+      const children = await driveListChildren(folder.id, driveAccessToken);
+      const dataFiles = children.filter(f => driveSupportedDataFile(f) && !/fixture/i.test(f.name || ''));
+      log(`Drive: ${folder.name} contains ${dataFiles.length} supported history data file(s)`);
+      for (const file of dataFiles) {
+        filesSeen++;
+        // Avoid loading the same filename twice if a dated sync folder contains a copy.
+        if (seenFileNames.has(file.name)) {
+          log(`Drive: skipping duplicate copy ${folder.name}/${file.name}`);
           continue;
         }
-        // Replace if already loaded
-        if (loadedFiles.includes(filename)) {
-          Object.keys(histSheets).filter(k => k.startsWith(filename + '::')).forEach(k => delete histSheets[k]);
-          loadedFiles.splice(loadedFiles.indexOf(filename), 1);
+        seenFileNames.add(file.name);
+        const sourceName = `${folder.name}/${file.name}`;
+        try {
+          log(`Drive: fetching ${sourceName}…`);
+          const result = await driveReadFile(file, driveAccessToken);
+          if (!Object.values(result.sheets).some(rows => rows && rows.length)) {
+            log(`Drive: ${sourceName} has no data rows — skipping`, 'err');
+            continue;
+          }
+          if (loadedFiles.includes(sourceName)) {
+            Object.keys(histSheets).filter(k => k.startsWith(sourceName + '::')).forEach(k => delete histSheets[k]);
+            loadedFiles.splice(loadedFiles.indexOf(sourceName), 1);
+          }
+          for (const [sheetName, rows] of Object.entries(result.sheets)) {
+            histSheets[`${sourceName}::${sheetName}`] = rows;
+          }
+          loadedFiles.push(sourceName);
+          loaded++;
+          log(`✓ Drive: ${sourceName} (updated ${result.modified})`, 'ok');
+        } catch (e) {
+          log(`Drive error — ${sourceName}: ${e.message}`, 'err');
         }
-        for (const [sh, rows] of Object.entries(result.sheets)) {
-          histSheets[`${filename}::${sh}`] = rows;
-        }
-        loadedFiles.push(filename);
-        loaded++;
-        log(`✓ Drive: ${filename} (updated ${result.modified})`, 'ok');
-      } catch (e) {
-        errors.push(filename);
-        log(`Drive error — ${filename}: ${e.message}`, 'err');
       }
     }
 
     rebuildIndex();
     renderFileList();
-
     if (loaded > 0) {
-      driveStatus(`✓ ${loaded} file${loaded>1?'s':''} loaded from Drive`, 'ok');
-      log(`Drive sync complete — ${Object.keys(masterIdx).length} teams indexed`, 'ok');
-      // Auto-load fixtures after history is ready
+      driveStatus(`✓ ${loaded} file${loaded !== 1 ? 's' : ''} loaded from Drive`, 'ok');
+      log(`Drive sync complete — ${Object.keys(masterIdx).length} teams indexed from ${filesSeen} candidate file(s)`, 'ok');
       await loadFixturesFromDrive(false);
     } else {
-      driveStatus('No history files found — run Apps Script bulk download first', 'err');
+      const available = items.map(f => f.name + (f.mimeType === 'application/vnd.google-apps.folder' ? ' [folder]' : '')).join(', ');
+      driveStatus('No history data files found in the season folders', 'err');
+      log(`No supported history files found in ${sourceFolders.map(f => f.name).join(', ')}. Root contains: ${available || '(empty)'}`, 'err');
     }
-
   } catch (e) {
     driveStatus('Drive load failed: ' + e.message, 'err');
     log('Drive: ' + e.message, 'err');
   }
-
-  btn.disabled = false;
+  if (btn) btn.disabled = false;
 }
 
-// ── Load fixtures from Drive (can be called standalone too) ────────
+// Fixtures are now stored inside the Upcoming_Fixtures subfolder. Prefer the
+// master fixture workbook if present; otherwise combine supported files found there.
 async function loadFixturesFromDrive(needsSignIn = true) {
   const btn = document.getElementById('driveFixBtn');
   if (btn) btn.disabled = true;
   driveFixStatus('Loading fixtures from Drive…', 'loading');
-
   try {
     if (needsSignIn) {
-      if (!window.google || !window.google.accounts) {
-        await loadScript('https://accounts.google.com/gsi/client');
+      if (!window.google || !window.google.accounts) await loadScript('https://accounts.google.com/gsi/client');
+      if (!driveAccessToken) driveAccessToken = await getGoogleAccessToken();
+    }
+    if (!driveAccessToken) throw new Error('Google Drive is not connected. Click Load from Drive first.');
+
+    const { folders } = await driveGetRootFolders(driveAccessToken);
+    const folder = driveFindFolder(folders, DRIVE_FIX_FOLDER);
+    if (!folder) throw new Error(`Folder "${DRIVE_FIX_FOLDER}" was not found in the selected Drive folder.`);
+    let files = (await driveListChildren(folder.id, driveAccessToken)).filter(driveSupportedDataFile);
+    files.sort((a, b) => {
+      const score = f => /master.*fixture|upcoming.*fixture|fixture/i.test(f.name) ? 1 : 0;
+      return score(b) - score(a) || String(b.modifiedTime || '').localeCompare(String(a.modifiedTime || ''));
+    });
+    if (!files.length) throw new Error(`No CSV, XLSX, XLS, or Google Sheets files found in ${DRIVE_FIX_FOLDER}.`);
+
+    const combined = {};
+    let totalRows = 0, loadedNames = [];
+    for (const file of files) {
+      log(`Drive fixtures: fetching ${DRIVE_FIX_FOLDER}/${file.name}…`);
+      const result = await driveReadFile(file, driveAccessToken);
+      for (const [sheetName, rows] of Object.entries(result.sheets)) {
+        // Keep the sheet names recognizable to the existing fixture importer.
+        const key = combined[sheetName] ? `${file.name} :: ${sheetName}` : sheetName;
+        combined[key] = rows;
+        totalRows += rows.length;
       }
-      if (!driveAccessToken) {
-        driveAccessToken = await getGoogleAccessToken();
-      }
+      loadedNames.push(file.name);
     }
-
-    const result = await driveDownloadFile(DRIVE_FIX_FILE, driveAccessToken);
-
-    if (!result) {
-      driveFixStatus('Upcoming_Fixtures.xlsx not found — run fixturesUpdate() in Apps Script', 'err');
-      log('Drive fixtures: file not found in folder', 'err');
-      if (btn) btn.disabled = false;
-      return;
-    }
-
-    // Load into fixSheets — merge all sheets
-    fixSheets = {};
-    let totalRows = 0;
-    for (const [sh, rows] of Object.entries(result.sheets)) {
-      fixSheets[sh] = rows;
-      totalRows += rows.length;
-    }
-
-    driveFixStatus(`✓ ${totalRows} fixture${totalRows!==1?'s':''} loaded (updated ${result.modified})`, 'ok');
-    log(`✓ Drive fixtures: ${totalRows} upcoming fixtures loaded from ${Object.keys(fixSheets).length} sheet(s)`, 'ok');
-
-    // Update the fixtures panel UI
+    if (!totalRows) throw new Error('Fixture files were found, but no rows could be read.');
+    fixSheets = combined;
+    driveFixStatus(`✓ ${totalRows} fixture rows loaded from ${loadedNames.length} file(s)`, 'ok');
+    log(`✓ Drive fixtures: ${totalRows} rows loaded from ${loadedNames.join(', ')}`, 'ok');
     const stB = document.getElementById('stB');
-    if (stB) stB.textContent = `Drive · ${totalRows} fixtures · ${result.modified}`;
+    if (stB) stB.textContent = `Drive · ${totalRows} fixtures`;
     const cardB = document.getElementById('cardB');
     if (cardB) cardB.classList.add('active');
-
     checkReady();
-
   } catch (e) {
     driveFixStatus('Failed to load fixtures: ' + e.message, 'err');
     log('Drive fixtures error: ' + e.message, 'err');
   }
-
   if (btn) btn.disabled = false;
 }
 
