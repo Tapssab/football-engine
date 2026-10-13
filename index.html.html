@@ -911,141 +911,176 @@ function driveFixStatus(msg, type) {
 }
 
 // ── Helper: search + download one file from Drive ──────────────────
-async function driveDownloadFile(filename, token) {
-  const searchUrl = `https://www.googleapis.com/drive/v3/files?q=name='${filename}'+and+'${DRIVE_FOLDER_ID}'+in+parents+and+trashed=false&fields=files(id,name,modifiedTime)`;
-  const searchRes = await fetch(searchUrl, { headers: { Authorization: 'Bearer ' + token } });
-  const searchData = await searchRes.json();
-
-  if (searchData.error) throw new Error(`Drive API: ${JSON.stringify(searchData.error)}`);
-  if (!searchData.files || searchData.files.length === 0) return null; // not found
-
-  const fileId = searchData.files[0].id;
-  const modified = new Date(searchData.files[0].modifiedTime).toLocaleDateString();
-
-  const dlRes = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
-    headers: { Authorization: 'Bearer ' + token }
-  });
-  if (!dlRes.ok) throw new Error(`Download failed: HTTP ${dlRes.status}`);
-
-  const arrayBuffer = await dlRes.arrayBuffer();
-  const wb = XLSX.read(arrayBuffer, { type: 'array' });
-  const sheets = {};
-  for (const n of wb.SheetNames) {
-    sheets[n] = XLSX.utils.sheet_to_json(wb.Sheets[n], { defval: '', raw: false });
-  }
-  return { sheets, modified };
+async function driveListFolderFiles(token) {
+  let out = [], tok = '';
+  do {
+    const q = encodeURIComponent("'" + DRIVE_FOLDER_ID + "' in parents and trashed=false");
+    const res = await fetch('https://www.googleapis.com/drive/v3/files?q=' + q + '&fields=nextPageToken,files(id,name,mimeType,modifiedTime)&pageSize=1000' + (tok ? '&pageToken=' + tok : ''), { headers: { Authorization: 'Bearer ' + token } });
+    const d = await res.json();
+    if (d.error) throw new Error('Drive API: ' + JSON.stringify(d.error));
+    out = out.concat(d.files || []); tok = d.nextPageToken || '';
+  } while (tok);
+  return out;
 }
 
-// ── Main Drive load — historical results ───────────────────────────
+// Excel dates are read as real dates and written as YYYY-MM-DD, so the day/month order can never be misread
+function driveIsoFromDate(v) {
+  const d = new Date(v.getTime() + 12 * 3600e3);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+function driveSheetRows(ws) {
+  const rows = XLSX.utils.sheet_to_json(ws, { defval: '', raw: false });
+  const raw = XLSX.utils.sheet_to_json(ws, { defval: '', raw: true });
+  if (raw.length === rows.length) {
+    for (let i = 0; i < rows.length; i++) {
+      const r = raw[i];
+      for (const k in r) {
+        if (/^date$/i.test(k) && Object.prototype.toString.call(r[k]) === '[object Date]' && !isNaN(r[k])) rows[i][k] = driveIsoFromDate(r[k]);
+      }
+    }
+  }
+  return rows;
+}
+
+async function driveDownloadById(file, token) {
+  const isGoogleSheet = file.mimeType === 'application/vnd.google-apps.spreadsheet';
+  const url = isGoogleSheet
+    ? 'https://www.googleapis.com/drive/v3/files/' + file.id + '/export?mimeType=' + encodeURIComponent('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    : 'https://www.googleapis.com/drive/v3/files/' + file.id + '?alt=media';
+  const dl = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
+  if (!dl.ok) throw new Error('Download failed: HTTP ' + dl.status);
+  const wb = XLSX.read(await dl.arrayBuffer(), { type: 'array', cellDates: true });
+  const sheets = {};
+  for (const n of wb.SheetNames) sheets[n] = driveSheetRows(wb.Sheets[n]);
+  return { sheets, modified: new Date(file.modifiedTime).toLocaleDateString() };
+}
+
+// Which history group a Drive file belongs to (null = not a history file)
+function driveHistGroup(name) {
+  if (/fixture/i.test(name)) return null;
+  if (/^all-euro-data/i.test(name)) return 'all-euro-data.xlsx';
+  if (/^new_leagues_data/i.test(name)) return 'new_leagues_data.xlsx';
+  if (DRIVE_HIST_FILES.includes(name)) return name;
+  return null;
+}
+
+// new_leagues_data.xlsx has one sheet per country with a League column: split into one sheet per league
+function driveSplitNewLeagues(sheets) {
+  const out = {}; const minT = SEASON_START.getTime();
+  for (const rows of Object.values(sheets)) {
+    for (const r of rows) {
+      const h = String(r.Home || '').trim(), a = String(r.Away || '').trim();
+      if (!h || !a) continue;
+      const ds = String(r.Date || '').trim(); const d = parseMatchDate(ds);
+      if (!d || isNaN(d) || d.getTime() < minT) continue;
+      const lg = (String(r.Country || '').trim() + ' ' + String(r.League || '').trim()).replace(/\s+/g, ' ').trim() || 'New league';
+      (out[lg] = out[lg] || []).push({ Date: ds, HomeTeam: h, AwayTeam: a, FTHG: r.HG, FTAG: r.AG, Country: r.Country, League: r.League });
+    }
+  }
+  for (const k in out) out[k].sort((x, y) => parseMatchDate(x.Date) - parseMatchDate(y.Date));
+  return out;
+}
+
+// Fixtures that name a country + league (new_league_fixtures.xlsx) are matched to the history sheet of the same league
+function driveResolveLeague(country, league) {
+  if (!league) return '';
+  const want = ((country || '') + ' ' + league).replace(/\s+/g, ' ').trim().toLowerCase();
+  const k = Object.keys(histSheets).find(key => { const i = key.indexOf('::'); return i >= 0 && key.slice(i + 2).toLowerCase() === want; });
+  return k || league;
+}
+
+async function driveSignIn() {
+  if (!window.google || !window.google.accounts) await loadScript('https://accounts.google.com/gsi/client');
+  if (!driveAccessToken) driveAccessToken = await getGoogleAccessToken();
+}
+
 async function loadFromDrive() {
   const btn = document.getElementById('driveBtn');
   btn.disabled = true;
-  driveStatus('Signing in to Google…', 'loading');
-
+  driveStatus('Signing in to Google...', 'loading');
   try {
-    if (!window.google || !window.google.accounts) {
-      await loadScript('https://accounts.google.com/gsi/client');
+    driveAccessToken = null;
+    await driveSignIn();
+    driveStatus('Connected - listing folder...', 'loading');
+    const files = await driveListFolderFiles(driveAccessToken);
+    log('Drive folder contents (' + files.length + ' files): ' + files.map(f => f.name).join(', '));
+    const plan = {};
+    for (const f of files) { const g = driveHistGroup(f.name); if (g) (plan[g] = plan[g] || []).push(f); }
+    const groups = Object.keys(plan);
+    if (!groups.length) {
+      driveStatus('No history files found in the Drive folder', 'err');
+      log('No history files matched. Looking for all-euro-data-*.xlsx and new_leagues_data.xlsx. Files in folder: ' + files.map(f => f.name).join(', '), 'err');
+      btn.disabled = false; return;
     }
-    driveAccessToken = await getGoogleAccessToken();
-    driveStatus('Connected — fetching historical files…', 'loading');
-
     let loaded = 0;
-    const errors = [];
-
-    for (const filename of DRIVE_HIST_FILES) {
-      try {
-        log(`Drive: fetching ${filename}…`);
-        const result = await driveDownloadFile(filename, driveAccessToken);
-        if (!result) {
-          log(`Drive: ${filename} not found in folder — skipping`, 'err');
-          continue;
-        }
-        // Replace if already loaded
-        if (loadedFiles.includes(filename)) {
-          Object.keys(histSheets).filter(k => k.startsWith(filename + '::')).forEach(k => delete histSheets[k]);
-          loadedFiles.splice(loadedFiles.indexOf(filename), 1);
-        }
-        for (const [sh, rows] of Object.entries(result.sheets)) {
-          histSheets[`${filename}::${sh}`] = rows;
-        }
-        loadedFiles.push(filename);
-        loaded++;
-        log(`✓ Drive: ${filename} (updated ${result.modified})`, 'ok');
-      } catch (e) {
-        errors.push(filename);
-        log(`Drive error — ${filename}: ${e.message}`, 'err');
+    for (const g of groups) {
+      Object.keys(histSheets).filter(k => k.startsWith(g + '::')).forEach(k => delete histSheets[k]);
+      const li = loadedFiles.indexOf(g); if (li >= 0) loadedFiles.splice(li, 1);
+      for (const f of plan[g].sort((a, b) => a.name.localeCompare(b.name))) {
+        try {
+          driveStatus('Reading ' + f.name + '...', 'loading');
+          log('Drive: fetching ' + f.name + '...');
+          await new Promise(r => setTimeout(r, 0));
+          const res = await driveDownloadById(f, driveAccessToken);
+          const sheets = /^new_leagues_data/i.test(g) ? driveSplitNewLeagues(res.sheets) : res.sheets;
+          let n = 0;
+          for (const [sh, rows] of Object.entries(sheets)) { const key = g + '::' + sh; histSheets[key] = (histSheets[key] || []).concat(rows); n += rows.length; }
+          log('OK Drive: ' + f.name + ' - ' + n.toLocaleString() + ' rows (updated ' + res.modified + ')', 'ok');
+        } catch (e) { log('Drive error - ' + f.name + ': ' + e.message, 'err'); }
       }
+      if (Object.keys(histSheets).some(k => k.startsWith(g + '::'))) { loadedFiles.push(g); loaded++; }
     }
-
     rebuildIndex();
     renderFileList();
-
     if (loaded > 0) {
-      driveStatus(`✓ ${loaded} file${loaded>1?'s':''} loaded from Drive`, 'ok');
-      log(`Drive sync complete — ${Object.keys(masterIdx).length} teams indexed`, 'ok');
-      // Auto-load fixtures after history is ready
+      driveStatus(loaded + ' source' + (loaded > 1 ? 's' : '') + ' loaded from Drive', 'ok');
+      log('Drive sync complete - ' + Object.keys(masterIdx).length + ' teams indexed', 'ok');
       await loadFixturesFromDrive(false);
     } else {
-      driveStatus('No history files found — run Apps Script bulk download first', 'err');
+      driveStatus('History files were found but none could be read', 'err');
     }
-
   } catch (e) {
     driveStatus('Sign-in failed or cancelled', 'err');
     log('Drive: ' + e.message, 'err');
   }
-
   btn.disabled = false;
 }
 
-// ── Load fixtures from Drive (can be called standalone too) ────────
 async function loadFixturesFromDrive(needsSignIn = true) {
   const btn = document.getElementById('driveFixBtn');
   if (btn) btn.disabled = true;
-  driveFixStatus('Loading fixtures from Drive…', 'loading');
-
+  driveFixStatus('Loading fixtures from Drive...', 'loading');
   try {
-    if (needsSignIn) {
-      if (!window.google || !window.google.accounts) {
-        await loadScript('https://accounts.google.com/gsi/client');
-      }
-      if (!driveAccessToken) {
-        driveAccessToken = await getGoogleAccessToken();
-      }
+    if (needsSignIn) await driveSignIn();
+    const files = (await driveListFolderFiles(driveAccessToken)).filter(f => /fixture/i.test(f.name));
+    if (!files.length) {
+      driveFixStatus('No fixtures files found (looking for fixtures.xlsx / new_league_fixtures.xlsx)', 'err');
+      log('Drive fixtures: no file with "fixture" in its name in the folder', 'err');
+      if (btn) btn.disabled = false; return;
     }
-
-    const result = await driveDownloadFile(DRIVE_FIX_FILE, driveAccessToken);
-
-    if (!result) {
-      driveFixStatus('Upcoming_Fixtures.xlsx not found — run fixturesUpdate() in Apps Script', 'err');
-      log('Drive fixtures: file not found in folder', 'err');
-      if (btn) btn.disabled = false;
-      return;
-    }
-
-    // Load into fixSheets — merge all sheets
     fixSheets = {};
-    let totalRows = 0;
-    for (const [sh, rows] of Object.entries(result.sheets)) {
-      fixSheets[sh] = rows;
-      totalRows += rows.length;
+    let totalRows = 0, modified = '';
+    for (const f of files.sort((a, b) => a.name.localeCompare(b.name))) {
+      const res = await driveDownloadById(f, driveAccessToken);
+      modified = res.modified;
+      const stem = f.name.replace(/\.[a-z0-9]+$/i, '');
+      const names = Object.keys(res.sheets);
+      for (const sh of names) {
+        const key = names.length > 1 ? stem + ':' + sh : stem;
+        fixSheets[key] = res.sheets[sh]; totalRows += res.sheets[sh].length;
+      }
+      log('OK Drive fixtures: ' + f.name + ' - ' + names.reduce((s, n) => s + res.sheets[n].length, 0) + ' rows', 'ok');
     }
-
-    driveFixStatus(`✓ ${totalRows} fixture${totalRows!==1?'s':''} loaded (updated ${result.modified})`, 'ok');
-    log(`✓ Drive fixtures: ${totalRows} upcoming fixtures loaded from ${Object.keys(fixSheets).length} sheet(s)`, 'ok');
-
-    // Update the fixtures panel UI
+    driveFixStatus(totalRows + ' fixture' + (totalRows !== 1 ? 's' : '') + ' loaded (updated ' + modified + ')', 'ok');
     const stB = document.getElementById('stB');
-    if (stB) stB.textContent = `Drive · ${totalRows} fixtures · ${result.modified}`;
+    if (stB) stB.textContent = 'Drive - ' + totalRows + ' fixtures - ' + modified;
     const cardB = document.getElementById('cardB');
     if (cardB) cardB.classList.add('active');
-
     checkReady();
-
   } catch (e) {
     driveFixStatus('Failed to load fixtures: ' + e.message, 'err');
     log('Drive fixtures error: ' + e.message, 'err');
   }
-
   if (btn) btn.disabled = false;
 }
 
@@ -2792,8 +2827,8 @@ document.getElementById('runBtn').addEventListener('click',async()=>{
         // Use Drive-provided league/country if available; otherwise detect from history
         const rowLeague  = c_league  ? String(r[c_league ]||'').trim() : '';
         const rowCountry = c_country ? String(r[c_country]||'').trim() : '';
-        const league = rowLeague || detectLeague(home,away,histSheets,masterIdx);
-        const kickoff= c_kickoff ? String(r[c_kickoff]||'').trim() : '';
+        const league = driveResolveLeague(rowCountry,rowLeague) || detectLeague(home,away,histSheets,masterIdx);
+        const kickoff= c_kickoff ? String(r[c_kickoff]||'').trim() : ((c_date&&r[c_date]&&r['Time'])?String(r[c_date]).trim()+' '+String(r['Time']).trim():'');
         const date   = c_date    ? String(r[c_date   ]||'').trim() : '';
         const round  = c_round   ? String(r[c_round  ]||'').trim() : '';
         const meta   = { kickoff, date, round, country: rowCountry, region: sh };
