@@ -317,155 +317,10 @@ td{padding:8px 11px;white-space:nowrap;vertical-align:middle}
 .resize-handle:hover::after,.resize-handle.dragging::after{background:var(--accent)}
 /* hot row accent */
 table.ftable tbody tr.hot td:first-child{box-shadow:inset 2px 0 0 var(--accent)}
-
-/* ══════════════════════════════════════════════
-   RESPONSIVE — base mobile-safe rules
-   ══════════════════════════════════════════════ */
-body{overflow-x:hidden}
-img,video,svg{max-width:100%;height:auto}
-.main{min-width:0}
-.tbl-wrap{-webkit-overflow-scrolling:touch}
-
-/* ── Sidebar toggle button (mobile only, hidden on desktop) ── */
-.sb-toggle{
-  display:none;align-items:center;justify-content:center;
-  gap:6px;width:100%;padding:10px 14px;
-  background:var(--glass);border:1px solid var(--gb);border-radius:var(--rs);
-  color:var(--t2);font-family:var(--mono);font-size:.65rem;font-weight:600;
-  letter-spacing:1px;text-transform:uppercase;cursor:pointer;transition:var(--tr);
-  flex-shrink:0;
-}
-.sb-toggle:hover,.sb-toggle.open{border-color:var(--accent);color:var(--accent);background:rgba(0,229,160,.05);}
-.sb-toggle-arrow{transition:transform .25s;font-size:.7rem}
-.sb-toggle.open .sb-toggle-arrow{transform:rotate(180deg)}
-
-/* ══════════════════════════════════════════════
-   TABLET  (≤ 900px)
-   ══════════════════════════════════════════════ */
-@media(max-width:900px){
-  :root{--sw:260px}
-  .topbar{padding:0 14px;gap:10px}
-  .tb-stats{gap:10px}
-  .tb-stat{font-size:.54rem}
-  .main{padding:14px 14px 40px}
-}
-
-/* ══════════════════════════════════════════════
-   MOBILE  (≤ 768px)
-   ══════════════════════════════════════════════ */
-@media(max-width:768px){
-  /* Reset body overflow for mobile scrolling */
-  html,body{overflow:hidden}
-  body{overflow-x:hidden}
-
-  /* App shell stacks vertically */
-  #appShell{height:100dvh;height:100vh}
-  .app{flex-direction:column;overflow:hidden}
-
-  /* ── Topbar ── */
-  .topbar{padding:0 12px;height:48px;gap:8px;flex-wrap:nowrap;overflow:hidden}
-  .tbl-title{font-size:.8rem}
-  .tbl-sub{display:none}
-  .tb-stats{display:none}/* hide stats bar on small screens */
-  .back-btn{padding:5px 8px;font-size:.55rem;gap:4px}
-
-  /* ── Sidebar toggle button ── */
-  .sb-toggle{display:flex}
-
-  /* ── Sidebar collapses / expands ── */
-  .sidebar{
-    width:100%;max-height:0;overflow:hidden;
-    border-right:none;border-bottom:1px solid var(--gb);
-    padding:0 14px;gap:0;
-    transition:max-height .35s cubic-bezier(.4,0,.2,1),padding .3s,gap .3s;
-    flex-shrink:0;
-  }
-  .sidebar.sb-open{
-    max-height:70vh;overflow-y:auto;
-    padding:14px 14px 18px;gap:16px;
-  }
-
-  /* ── Main content ── */
-  .main{
-    flex:1;overflow-y:auto;
-    padding:12px 10px 60px;
-    gap:10px;min-width:0;
-  }
-
-  /* ── Table ── */
-  .tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:8px}
-  table.ftable{font-size:.65rem}
-  td{padding:6px 8px}
-  .td-fix{font-size:.68rem}
-  .fix-meta{gap:3px}
-  .fix-ko,.fix-rd,.fix-lg{font-size:.48rem}
-
-  /* ── Results header ── */
-  .res-hd{gap:8px}
-  .res-title{font-size:.88rem}
-  .sort-row{width:100%;justify-content:flex-end;margin-left:0}
-
-  /* ── Filter popover ── */
-  .filter-popover{
-    position:fixed;top:auto;bottom:0;right:0;left:0;
-    width:100%;border-radius:16px 16px 0 0;
-    max-height:80vh;overflow-y:auto;
-    box-shadow:0 -8px 40px rgba(0,0,0,.6);
-  }
-  .fp-grid{grid-template-columns:1fr}
-
-  /* ── Drawer ── */
-  .drawer{
-    width:100vw;top:0;right:0;bottom:0;
-    border-left:none;
-  }
-  .d-hd{padding:16px 16px 12px}
-  .d-body{padding:16px}
-  .model-grid{grid-template-columns:1fr 1fr}
-
-  /* ── Landing page ── */
-  .land-title{font-size:1.3rem}
-  .land-sub{font-size:.6rem;margin-bottom:30px}
-  .sport-grid{grid-template-columns:1fr 1fr;gap:12px}
-  .sport-card{padding:22px 14px 18px}
-  .sc-icon{font-size:1.8rem}
-  .sc-name{font-size:.82rem}
-  .sc-desc{font-size:.54rem}
-
-  /* ── Buttons / inputs — touch-friendly ── */
-  .run-btn{padding:14px;font-size:.82rem}
-  .icon-btn{padding:12px 8px;font-size:.6rem}
-  .fg input,.fg select,.fp-fg input,.fp-fg select{
-    padding:10px 10px;font-size:.75rem;min-height:40px
-  }
-  input[type=range]{width:100%;margin-top:4px}
-  .sl-row{flex-wrap:wrap;gap:8px}
-  .sl-lbl{width:100%;flex:unset}
-
-  /* ── Sidebar panels ── */
-  .dts-sum{gap:8px}
-  .dts-s{min-width:44px}
-}
-
-/* ══════════════════════════════════════════════
-   SMALL MOBILE  (≤ 480px)
-   ══════════════════════════════════════════════ */
-@media(max-width:480px){
-  .topbar{height:44px;padding:0 10px}
-  .tbl-icon{width:26px;height:26px;font-size:13px}
-  .tbl-title{font-size:.75rem}
-  .sport-grid{grid-template-columns:1fr 1fr;gap:8px}
-  .sport-card{padding:18px 10px 14px;border-radius:12px}
-  .sc-icon{font-size:1.5rem}
-  .sc-name{font-size:.75rem}
-  .sc-desc{display:none}
-  .land-title{font-size:1.15rem}
-  .d-fix{font-size:.82rem}
-  .model-grid{grid-template-columns:1fr}
-  table.ftable{font-size:.6rem}
-  td{padding:5px 6px}
-  .res-hd{flex-direction:column;align-items:flex-start;gap:6px}
-  .sort-row{width:100%}
+@media(max-width:700px){
+  .sidebar{width:100%;max-height:45vh}
+  .app{flex-direction:column}
+  .grid{grid-template-columns:1fr}
 }
 /* ═══════════════════════════════════════════════════
    LANDING PAGE — Sport Selector
@@ -574,6 +429,40 @@ img,video,svg{max-width:100%;height:auto}
 .lo-track{width:320px;max-width:80vw;height:6px;background:var(--glass);border-radius:3px;overflow:hidden;}
 .lo-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--accent),#00b8ff);border-radius:3px;transition:width .35s cubic-bezier(.4,0,.2,1);}
 .lo-count{font-family:var(--mono);font-size:.58rem;color:var(--t3);letter-spacing:.5px;}
+/* ---- Backtest page ---- */
+.tabs{display:flex;gap:4px;margin-left:8px}
+.tab-btn{background:transparent;border:1px solid transparent;color:var(--t2);font-family:var(--sans);font-size:.72rem;font-weight:600;padding:7px 14px;border-radius:var(--rs);cursor:pointer;transition:var(--tr)}
+.tab-btn:hover{color:var(--t1);background:var(--glass)}
+.tab-btn.active{color:var(--accent);background:rgba(0,229,160,.08);border-color:rgba(0,229,160,.25)}
+#btApp .sidebar{width:320px}
+.bt-fl{display:flex;flex-direction:column;gap:4px;margin-top:6px}
+.bt-fl label{font-size:.53rem;font-weight:500;color:var(--t3);text-transform:uppercase;letter-spacing:1.2px}
+.bt-in{background:var(--glass);border:1px solid var(--gb);border-radius:6px;color:var(--t1);padding:7px 8px;font-family:var(--mono);font-size:.62rem;outline:none;width:100%}
+.bt-in:focus{border-color:var(--accent)}
+.bt-two{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.bt-dlist{margin-top:8px;display:flex;flex-direction:column;gap:4px;max-height:160px;overflow-y:auto}
+.bt-dl{font-family:var(--mono);font-size:.54rem;color:var(--t2);padding:5px 8px;background:var(--glass);border:1px solid var(--gb);border-radius:5px;line-height:1.5}
+.bt-dl b{color:var(--t1);display:block}
+.bt-stale{font-family:var(--mono);font-size:.56rem;color:var(--a3);background:rgba(255,209,102,.08);border:1px solid rgba(255,209,102,.25);border-radius:6px;padding:7px 9px;margin-bottom:8px}
+.bt-prog{margin-bottom:8px}
+#btOut{display:flex;flex-direction:column;gap:12px}
+.bt-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
+.bt-card{background:var(--glass);border:1px solid var(--gb);border-radius:var(--r);padding:14px 16px}
+.bt-ct{font-size:.55rem;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:6px}
+.bt-cv{font-family:var(--mono);font-size:1.5rem;font-weight:700;color:var(--t1)}
+.bt-cs{font-size:.62rem;color:var(--t2);margin-top:5px;line-height:1.5}
+#btOut .good{color:#4ade80}#btOut .bad{color:var(--a2)}
+.bt-sec{font-size:.8rem;font-weight:700;margin-top:10px;letter-spacing:.2px}
+.bt-note{font-size:.68rem;color:var(--t2);line-height:1.6;max-width:900px}
+.bt-note b{color:var(--t1)}
+.bt-t{border-collapse:collapse;width:100%;max-width:900px;font-size:.68rem;background:var(--glass);border:1px solid var(--gb);border-radius:8px;overflow:hidden}
+.bt-t th{font-family:var(--mono);font-size:.52rem;letter-spacing:1.2px;text-transform:uppercase;color:var(--t3);text-align:left;padding:8px 10px;border-bottom:1px solid var(--gb)}
+.bt-t td{padding:7px 10px;border-bottom:1px solid rgba(255,255,255,.04);font-family:var(--mono)}
+.bt-t tr.cur td{background:rgba(0,229,160,.07)}
+.bt-cals{display:flex;gap:14px;flex-wrap:wrap}
+.bt-cal{width:190px;height:190px;background:var(--glass);border:1px solid var(--gb);border-radius:8px}
+.bt-st{font-family:var(--mono);font-size:8px;fill:var(--t2)}
+
 </style>
 </head>
 <body>
@@ -641,6 +530,7 @@ img,video,svg{max-width:100%;height:auto}
       </div>
     </div>
   </div>
+  <div class="tabs"><button class="tab-btn active" id="tabPred" onclick="showPage('pred')">Predictions</button><button class="tab-btn" id="tabBt" onclick="showPage('backtest')">Backtest</button></div>
   <div class="tb-stats" id="topStats" style="display:none">
     <div class="tb-stat">Fixtures: <b id="ts-fix">0</b></div>
     <div class="tb-stat">Teams: <b id="ts-teams">0</b></div>
@@ -651,16 +541,10 @@ img,video,svg{max-width:100%;height:auto}
   </div>
 </div>
 
-<div class="app">
-
-  <!-- SIDEBAR TOGGLE (mobile only) -->
-  <button class="sb-toggle" id="sbToggle" onclick="toggleSidebar()" aria-label="Toggle sidebar">
-    <span>⚙ Settings</span>
-    <span class="sb-toggle-arrow">▲</span>
-  </button>
+<div class="app" id="predApp">
 
   <!-- SIDEBAR -->
-  <aside class="sidebar" id="mainSidebar">
+  <aside class="sidebar">
 
     <div>
       <div class="sb-hd">Historical Data</div>
@@ -709,17 +593,6 @@ img,video,svg{max-width:100%;height:auto}
         Refresh Fixtures from Drive
       </button>
       <div class="drive-status" id="driveFixStatus"></div>
-
-      <!-- Manual fixture upload -->
-      <div style="margin-top:10px;border-top:1px solid var(--gb);padding-top:10px">
-        <div style="font-family:var(--mono);font-size:.58rem;color:var(--t3);margin-bottom:6px;letter-spacing:.5px;">OR ADD MANUAL FIXTURES FILE</div>
-        <label class="add-file-btn" id="manualFixLabel" style="cursor:pointer;display:flex;align-items:center;gap:8px;background:var(--sb);border:1px solid var(--gb);border-radius:6px;padding:7px 10px;font-size:.68rem;color:var(--t2);transition:border-color .15s" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--gb)'">
-          <input type="file" id="manualFixFile" accept=".xlsx,.xls" style="display:none">
-          <span style="font-size:1rem">📂</span>
-          <span id="manualFixLabelText">Upload fixtures .xlsx…</span>
-        </label>
-        <div class="drive-status" id="manualFixStatus"></div>
-      </div>
     </div>
 
     <div>
@@ -889,8 +762,8 @@ img,video,svg{max-width:100%;height:auto}
                 <div class="fp-fg"><label>Home λ ≤</label><input type="number" id="fHlamMax" step="0.1" min="0" placeholder="max"></div>
                 <div class="fp-fg"><label>Away λ ≥</label><input type="number" id="fAlam" step="0.1" min="0" placeholder="min"></div>
                 <div class="fp-fg"><label>Away λ ≤</label><input type="number" id="fAlamMax" step="0.1" min="0" placeholder="max"></div>
-                <div class="fp-fg"><label>Home CS ≤</label><input type="number" id="fHcs" min="0" placeholder="max"></div>
-                <div class="fp-fg"><label>Away CS ≤</label><input type="number" id="fAcs" min="0" placeholder="max"></div>
+                <div class="fp-fg"><label>Home CS ≥</label><input type="number" id="fHcs" min="0" placeholder="0"></div>
+                <div class="fp-fg"><label>Away CS ≥</label><input type="number" id="fAcs" min="0" placeholder="0"></div>
                 <div class="fp-fg fp-full"><label>Form Diff (any direction) ≥</label><input type="number" id="fFormDiff" step="1" min="0" max="100" placeholder="e.g. 30"></div>
                 <div class="fp-fg"><label>Match BTTS % ≥</label><input type="number" id="fMbtts" step="1" min="0" max="100" placeholder="min"></div>
                 <div class="fp-fg"><label>Match BTTS % ≤</label><input type="number" id="fMbttsMax" step="1" min="0" max="100" placeholder="max"></div>
@@ -944,6 +817,63 @@ img,video,svg{max-width:100%;height:auto}
   <div class="d-body" id="dBody"></div>
 </div>
 
+<div class="app" id="btApp" style="display:none">
+  <aside class="sidebar">
+    <div>
+      <div class="sb-hd">Backtest Data</div>
+      <div class="bt-fl"><label>Drive folder ID</label><input class="bt-in" id="btFolderId" value=""></div>
+      <div class="bt-fl"><label>Skip files containing</label><input class="bt-in" id="btSkip" value="fixture"></div>
+      <button class="drive-btn" id="btDriveBtn" style="margin-top:8px">Load from Google Drive</button>
+      <div class="drive-status" id="btDriveStatus"></div>
+      <div class="add-file-btn" style="margin-top:7px"><input type="file" id="btFileIn" accept=".csv,.xlsx,.xls" multiple><span class="add-file-plus">+</span><span>Add CSV / XLSX files</span></div>
+      <div class="bt-dlist" id="btDataList"></div>
+    </div>
+    <div>
+      <div class="sb-hd">Test Setup</div>
+      <div class="bt-fl"><label>Seasons to test</label><select class="bt-in" id="btSeasons" data-bt><option value="both">Last + current season</option><option value="last">Last season only</option><option value="cur">Current season only</option></select></div>
+      <div class="bt-fl"><label>History each prediction can see</label><select class="bt-in" id="btHist" data-bt><option value="prev">This + previous season (how the app works now)</option><option value="same">This season only</option></select></div>
+      <div class="bt-two">
+        <div class="bt-fl"><label>Skip first games</label><input class="bt-in" type="number" id="btWarm" value="5" min="0" max="20" data-bt></div>
+        <div class="bt-fl"><label>Refresh every (days)</label><input class="bt-in" type="number" id="btBatch" value="7" min="1" max="30" data-bt></div>
+      </div>
+    </div>
+    <div>
+      <div class="sb-hd">Model (needs re-run)</div>
+      <div class="sl-row"><div class="sl-lbl">Last N games</div><input type="range" id="btN" min="3" max="40" value="10" data-bt><div class="sl-val" id="btNV">10</div></div>
+      <div class="sl-row" style="margin-top:6px"><div class="sl-lbl">Recency a</div><input type="range" id="btAlpha" min="60" max="100" value="85" data-bt><div class="sl-val" id="btAlphaV">0.85</div></div>
+      <div class="bt-fl" style="margin-top:6px"><label>Elo K-factor</label><select class="bt-in" id="btEloK" data-bt><option>16</option><option>24</option><option selected>32</option><option>48</option></select></div>
+    </div>
+    <div>
+      <div class="sb-hd">Weights &amp; Thresholds (instant)</div>
+      <div class="sl-row"><div class="sl-lbl">Poisson</div><input type="range" id="btWP" min="0" max="100" value="50" data-bt><div class="sl-val" id="btWPV">50</div></div>
+      <div class="sl-row" style="margin-top:6px"><div class="sl-lbl">Elo</div><input type="range" id="btWE" min="0" max="100" value="30" data-bt><div class="sl-val" id="btWEV">30</div></div>
+      <div class="sl-row" style="margin-top:6px"><div class="sl-lbl">Form</div><input type="range" id="btWF" min="0" max="100" value="20" data-bt><div class="sl-val" id="btWFV">20</div></div>
+      <div id="btWSum" style="font-family:var(--mono);font-size:.55rem;margin:4px 0 8px;text-align:right"></div>
+      <div class="sl-row"><div class="sl-lbl">Conf: sample</div><input type="range" id="btCA" min="0" max="100" value="35" data-bt><div class="sl-val" id="btCAV">35</div></div>
+      <div class="sl-row" style="margin-top:6px"><div class="sl-lbl">Conf: agreement</div><input type="range" id="btCB" min="0" max="100" value="30" data-bt><div class="sl-val" id="btCBV">30</div></div>
+      <div class="sl-row" style="margin-top:6px"><div class="sl-lbl">Conf: signal</div><input type="range" id="btCG" min="0" max="100" value="20" data-bt><div class="sl-val" id="btCGV">20</div></div>
+      <div class="sl-row" style="margin-top:6px"><div class="sl-lbl">Conf: stability</div><input type="range" id="btCD" min="0" max="100" value="15" data-bt><div class="sl-val" id="btCDV">15</div></div>
+      <div class="sl-row" style="margin-top:8px"><div class="sl-lbl">Over 3.5 threshold</div><input type="range" id="btO35" min="30" max="90" value="55" data-bt><div class="sl-val" id="btO35V">0.55</div></div>
+      <div class="sl-row" style="margin-top:6px"><div class="sl-lbl">Under 1.5 threshold</div><input type="range" id="btU15" min="30" max="90" value="55" data-bt><div class="sl-val" id="btU15V">0.55</div></div>
+      <div class="bt-two" style="margin-top:8px">
+        <div class="bt-fl"><label>Min betting edge %</label><input class="bt-in" type="number" id="btEdge" value="5" min="0" max="50" data-bt></div>
+        <div class="bt-fl"><label>BTTS source</label><select class="bt-in" id="btMode" data-bt><option value="ens">Ensemble</option><option value="poisson">Poisson only</option></select></div>
+      </div>
+    </div>
+    <div>
+      <button class="icon-btn" id="btCopyBtn" style="width:100%;margin-bottom:8px">Copy settings from Predictions page</button>
+      <div class="bt-stale" id="btStale" style="display:none">Model settings changed. Press Run Backtest to refresh.</div>
+      <div class="bt-prog"><div class="progress-track"><div class="progress-fill" id="btProgFill"></div></div><div class="progress-label" id="btProgLbl"></div></div>
+      <button class="run-btn" id="btRunBtn">Run Backtest</button>
+      <div class="bt-fl" style="margin-top:10px"><label>Optimise for</label><select class="bt-in" id="btObj"><option value="blend">All markets (blend)</option><option value="btts">BTTS</option><option value="x12">1X2</option><option value="ou25">Over/Under 2.5</option></select></div>
+      <div class="bt-fl"><label>Leagues used for tuning (largest first)</label><input class="bt-in" type="number" id="btTuneN" value="12" min="3" max="60"></div>
+      <button class="icon-btn" id="btOptBtn" style="width:100%;margin-top:6px">Find best settings</button>
+      <button class="icon-btn" id="btCsvBtn" style="width:100%;margin-top:6px" disabled>Export predictions CSV</button>
+    </div>
+  </aside>
+  <main class="main"><div id="btOut"></div></main>
+</div>
+
 </div><!-- /appShell -->
 
 <script>
@@ -954,21 +884,16 @@ const DRIVE_FOLDER_ID = '1FSKEeRH22QXiPPNZ6FmTtC1yuQqKkCtK';
 
 // Historical results files — loaded into histSheets
 const DRIVE_HIST_FILES = [
-  'Europe_1.xlsx',        // England, Spain, Germany, Italy
-  'Europe_2.xlsx',        // Europe Part 2
-  'Europe_3.xlsx',        // Europe Part 3
-  'The_Americas.xlsx',    // USA, Brazil, Argentina, etc.
-  'Africa.xlsx',          // African Leagues
-  'Asia_ME_CIS.xlsx',     // Asia, Middle East, CIS, etc.
-  'International.xlsx',   // International Competitions
+  'Europe_Results.xlsx',
+  'Africa_Results.xlsx',
+  'Americas_Results.xlsx',
+  'Asia_ME_CIS_Results.xlsx',
+  'International_Competitions.xlsx',
+  'Daily_Patch.xlsx',
 ];
 
-// Fixtures files — 3 separate files, each with an "All_Fixtures" sheet
-const DRIVE_FIX_FILES = [
-  'fixtures_1.xlsx',
-  'fixtures_2.xlsx',
-  'fixtures_3.xlsx',
-];
+// Fixtures file — loaded into fixSheets (replaces manual upload)
+const DRIVE_FIX_FILE = 'Upcoming_Fixtures.xlsx';
 
 let driveAccessToken = null;
 
@@ -985,270 +910,178 @@ function driveFixStatus(msg, type) {
   el.className = 'drive-status ' + type;
 }
 
-// ── Helper: list ALL files in the Drive folder — no MIME filter (cached) ──
-let _driveFolderCache = null;
-async function driveFolderList(token) {
-  if (_driveFolderCache) return _driveFolderCache;
-  let allFiles = [];
-  let pageToken = '';
-  // No mimeType filter — catch xlsx, Google Sheets, any format Apps Script may have created
+// ── Helper: search + download one file from Drive ──────────────────
+async function driveListFolderFiles(token) {
+  let out = [], tok = '';
   do {
-    const q = encodeURIComponent(`'${DRIVE_FOLDER_ID}' in parents and trashed=false`);
-    const pt = pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : '';
-    const url = `https://www.googleapis.com/drive/v3/files?q=${q}&fields=nextPageToken,files(id,name,mimeType,modifiedTime)&pageSize=1000${pt}`;
-    const res = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
-    const data = await res.json();
-    if (data.error) throw new Error(`Drive API: ${JSON.stringify(data.error)}`);
-    allFiles = allFiles.concat(data.files || []);
-    pageToken = data.nextPageToken || '';
-  } while (pageToken);
-  const names = allFiles.map(f => `${f.name} [${f.mimeType.split('.').pop().split(';')[0]}]`).join(', ');
-  log(`Drive folder contents (${allFiles.length} files): ${names || '(empty)'}`);
-  _driveFolderCache = allFiles;
-  return allFiles;
+    const q = encodeURIComponent("'" + DRIVE_FOLDER_ID + "' in parents and trashed=false");
+    const res = await fetch('https://www.googleapis.com/drive/v3/files?q=' + q + '&fields=nextPageToken,files(id,name,mimeType,modifiedTime)&pageSize=1000' + (tok ? '&pageToken=' + tok : ''), { headers: { Authorization: 'Bearer ' + token } });
+    const d = await res.json();
+    if (d.error) throw new Error('Drive API: ' + JSON.stringify(d.error));
+    out = out.concat(d.files || []); tok = d.nextPageToken || '';
+  } while (tok);
+  return out;
 }
 
-// ── Helper: download one file from Drive, handling both xlsx and Google Sheets ──
-async function driveDownloadFile(filename, token) {
-  const files = await driveFolderList(token);
-  const base = filename.replace(/\.xlsx$/i, '');
-
-  // Match: exact name, then case-insensitive, then base name without extension
-  const match = files.find(f => f.name === filename)
-             || files.find(f => f.name.toLowerCase() === filename.toLowerCase())
-             || files.find(f => f.name.replace(/\.xlsx$/i,'').toLowerCase() === base.toLowerCase())
-             || files.find(f => f.name.toLowerCase().replace(/[_\s]/g,'') === base.toLowerCase().replace(/[_\s]/g,''));
-
-  if (!match) return null;
-
-  const isGSheet = match.mimeType === 'application/vnd.google-apps.spreadsheet';
-  let arrayBuffer;
-  const modified = new Date(match.modifiedTime).toLocaleDateString();
-
-  if (isGSheet) {
-    // Export Google Sheet as xlsx
-    const exportUrl = `https://www.googleapis.com/drive/v3/files/${match.id}/export?mimeType=application%2Fvnd.openxmlformats-officedocument.spreadsheetml.sheet`;
-    const res = await fetch(exportUrl, { headers: { Authorization: 'Bearer ' + token } });
-    if (!res.ok) throw new Error(`Export failed: HTTP ${res.status}`);
-    arrayBuffer = await res.arrayBuffer();
-  } else {
-    // Download raw file (xlsx, csv, etc.)
-    const res = await fetch(`https://www.googleapis.com/drive/v3/files/${match.id}?alt=media`, {
-      headers: { Authorization: 'Bearer ' + token }
-    });
-    if (!res.ok) throw new Error(`Download failed: HTTP ${res.status}`);
-    arrayBuffer = await res.arrayBuffer();
+// Excel dates are read as real dates and written as YYYY-MM-DD, so the day/month order can never be misread
+function driveIsoFromDate(v) {
+  const d = new Date(v.getTime() + 12 * 3600e3);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+function driveSheetRows(ws) {
+  const rows = XLSX.utils.sheet_to_json(ws, { defval: '', raw: false });
+  const raw = XLSX.utils.sheet_to_json(ws, { defval: '', raw: true });
+  if (raw.length === rows.length) {
+    for (let i = 0; i < rows.length; i++) {
+      const r = raw[i];
+      for (const k in r) {
+        if (/^date$/i.test(k) && Object.prototype.toString.call(r[k]) === '[object Date]' && !isNaN(r[k])) rows[i][k] = driveIsoFromDate(r[k]);
+      }
+    }
   }
+  return rows;
+}
 
-  const wb = XLSX.read(arrayBuffer, { type: 'array' });
+async function driveDownloadById(file, token) {
+  const isGoogleSheet = file.mimeType === 'application/vnd.google-apps.spreadsheet';
+  const url = isGoogleSheet
+    ? 'https://www.googleapis.com/drive/v3/files/' + file.id + '/export?mimeType=' + encodeURIComponent('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    : 'https://www.googleapis.com/drive/v3/files/' + file.id + '?alt=media';
+  const dl = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
+  if (!dl.ok) throw new Error('Download failed: HTTP ' + dl.status);
+  const wb = XLSX.read(await dl.arrayBuffer(), { type: 'array', cellDates: true });
   const sheets = {};
-  for (const n of wb.SheetNames) {
-    sheets[n] = XLSX.utils.sheet_to_json(wb.Sheets[n], { defval: '', raw: false });
-  }
-  return { sheets, modified };
+  for (const n of wb.SheetNames) sheets[n] = driveSheetRows(wb.Sheets[n]);
+  return { sheets, modified: new Date(file.modifiedTime).toLocaleDateString() };
 }
 
-// ── Main Drive load — historical results ───────────────────────────
+// Which history group a Drive file belongs to (null = not a history file)
+function driveHistGroup(name) {
+  if (/fixture/i.test(name)) return null;
+  if (/^all-euro-data/i.test(name)) return 'all-euro-data.xlsx';
+  if (/^new_leagues_data/i.test(name)) return 'new_leagues_data.xlsx';
+  if (DRIVE_HIST_FILES.includes(name)) return name;
+  return null;
+}
+
+// new_leagues_data.xlsx has one sheet per country with a League column: split into one sheet per league
+function driveSplitNewLeagues(sheets) {
+  const out = {}; const minT = SEASON_START.getTime();
+  for (const rows of Object.values(sheets)) {
+    for (const r of rows) {
+      const h = String(r.Home || '').trim(), a = String(r.Away || '').trim();
+      if (!h || !a) continue;
+      const ds = String(r.Date || '').trim(); const d = parseMatchDate(ds);
+      if (!d || isNaN(d) || d.getTime() < minT) continue;
+      const lg = (String(r.Country || '').trim() + ' ' + String(r.League || '').trim()).replace(/\s+/g, ' ').trim() || 'New league';
+      (out[lg] = out[lg] || []).push({ Date: ds, HomeTeam: h, AwayTeam: a, FTHG: r.HG, FTAG: r.AG, Country: r.Country, League: r.League });
+    }
+  }
+  for (const k in out) out[k].sort((x, y) => parseMatchDate(x.Date) - parseMatchDate(y.Date));
+  return out;
+}
+
+// Fixtures that name a country + league (new_league_fixtures.xlsx) are matched to the history sheet of the same league
+function driveResolveLeague(country, league) {
+  if (!league) return '';
+  const want = ((country || '') + ' ' + league).replace(/\s+/g, ' ').trim().toLowerCase();
+  const k = Object.keys(histSheets).find(key => { const i = key.indexOf('::'); return i >= 0 && key.slice(i + 2).toLowerCase() === want; });
+  return k || league;
+}
+
+async function driveSignIn() {
+  if (!window.google || !window.google.accounts) await loadScript('https://accounts.google.com/gsi/client');
+  if (!driveAccessToken) driveAccessToken = await getGoogleAccessToken();
+}
+
 async function loadFromDrive() {
   const btn = document.getElementById('driveBtn');
   btn.disabled = true;
-  driveStatus('Signing in to Google…', 'loading');
-
+  driveStatus('Signing in to Google...', 'loading');
   try {
-    if (!window.google || !window.google.accounts) {
-      await loadScript('https://accounts.google.com/gsi/client');
+    driveAccessToken = null;
+    await driveSignIn();
+    driveStatus('Connected - listing folder...', 'loading');
+    const files = await driveListFolderFiles(driveAccessToken);
+    log('Drive folder contents (' + files.length + ' files): ' + files.map(f => f.name).join(', '));
+    const plan = {};
+    for (const f of files) { const g = driveHistGroup(f.name); if (g) (plan[g] = plan[g] || []).push(f); }
+    const groups = Object.keys(plan);
+    if (!groups.length) {
+      driveStatus('No history files found in the Drive folder', 'err');
+      log('No history files matched. Looking for all-euro-data-*.xlsx and new_leagues_data.xlsx. Files in folder: ' + files.map(f => f.name).join(', '), 'err');
+      btn.disabled = false; return;
     }
-    driveAccessToken = await getGoogleAccessToken();
-    _driveFolderCache = null; // clear cache on new sign-in
-    driveStatus('Connected — fetching historical files…', 'loading');
-
     let loaded = 0;
-    const errors = [];
-
-    for (const filename of DRIVE_HIST_FILES) {
-      try {
-        log(`Drive: fetching ${filename}…`);
-        const result = await driveDownloadFile(filename, driveAccessToken);
-        if (!result) {
-          log(`Drive: ${filename} not found in folder — skipping`, 'err');
-          continue;
-        }
-        // Replace if already loaded
-        if (loadedFiles.includes(filename)) {
-          Object.keys(histSheets).filter(k => k.startsWith(filename + '::')).forEach(k => delete histSheets[k]);
-          loadedFiles.splice(loadedFiles.indexOf(filename), 1);
-        }
-        for (const [sh, rows] of Object.entries(result.sheets)) {
-          histSheets[`${filename}::${sh}`] = rows;
-        }
-        loadedFiles.push(filename);
-        loaded++;
-        log(`✓ Drive: ${filename} (updated ${result.modified})`, 'ok');
-      } catch (e) {
-        errors.push(filename);
-        log(`Drive error — ${filename}: ${e.message}`, 'err');
+    for (const g of groups) {
+      Object.keys(histSheets).filter(k => k.startsWith(g + '::')).forEach(k => delete histSheets[k]);
+      const li = loadedFiles.indexOf(g); if (li >= 0) loadedFiles.splice(li, 1);
+      for (const f of plan[g].sort((a, b) => a.name.localeCompare(b.name))) {
+        try {
+          driveStatus('Reading ' + f.name + '...', 'loading');
+          log('Drive: fetching ' + f.name + '...');
+          await new Promise(r => setTimeout(r, 0));
+          const res = await driveDownloadById(f, driveAccessToken);
+          const sheets = /^new_leagues_data/i.test(g) ? driveSplitNewLeagues(res.sheets) : res.sheets;
+          let n = 0;
+          for (const [sh, rows] of Object.entries(sheets)) { const key = g + '::' + sh; histSheets[key] = (histSheets[key] || []).concat(rows); n += rows.length; }
+          log('OK Drive: ' + f.name + ' - ' + n.toLocaleString() + ' rows (updated ' + res.modified + ')', 'ok');
+        } catch (e) { log('Drive error - ' + f.name + ': ' + e.message, 'err'); }
       }
+      if (Object.keys(histSheets).some(k => k.startsWith(g + '::'))) { loadedFiles.push(g); loaded++; }
     }
-
     rebuildIndex();
     renderFileList();
-
     if (loaded > 0) {
-      driveStatus(`✓ ${loaded} file${loaded>1?'s':''} loaded from Drive`, 'ok');
-      log(`Drive sync complete — ${Object.keys(masterIdx).length} teams indexed`, 'ok');
-      // Auto-load fixtures after history is ready
+      driveStatus(loaded + ' source' + (loaded > 1 ? 's' : '') + ' loaded from Drive', 'ok');
+      log('Drive sync complete - ' + Object.keys(masterIdx).length + ' teams indexed', 'ok');
       await loadFixturesFromDrive(false);
     } else {
-      // Show exactly what files ARE in the folder to help diagnose name mismatches
-      const folderFiles = _driveFolderCache || [];
-      const foundNames = folderFiles.length
-        ? `Files in folder: ${folderFiles.map(f=>f.name).join(', ')}`
-        : 'Folder appears empty or folder ID may be wrong';
-      driveStatus('No history files found — check log for details', 'err');
-      log('No history files matched. Expected: ' + DRIVE_HIST_FILES.join(', '), 'err');
-      log(foundNames, 'err');
+      driveStatus('History files were found but none could be read', 'err');
     }
-
   } catch (e) {
     driveStatus('Sign-in failed or cancelled', 'err');
     log('Drive: ' + e.message, 'err');
   }
-
   btn.disabled = false;
 }
 
-// ── Load fixtures from Drive (can be called standalone too) ────────
 async function loadFixturesFromDrive(needsSignIn = true) {
   const btn = document.getElementById('driveFixBtn');
   if (btn) btn.disabled = true;
   driveFixStatus('Loading fixtures from Drive...', 'loading');
-
   try {
-    if (needsSignIn) {
-      if (!window.google || !window.google.accounts) {
-        await loadScript('https://accounts.google.com/gsi/client');
-      }
-      if (!driveAccessToken) {
-        driveAccessToken = await getGoogleAccessToken();
-        _driveFolderCache = null; // clear cache on new sign-in
-      }
+    if (needsSignIn) await driveSignIn();
+    const files = (await driveListFolderFiles(driveAccessToken)).filter(f => /fixture/i.test(f.name));
+    if (!files.length) {
+      driveFixStatus('No fixtures files found (looking for fixtures.xlsx / new_league_fixtures.xlsx)', 'err');
+      log('Drive fixtures: no file with "fixture" in its name in the folder', 'err');
+      if (btn) btn.disabled = false; return;
     }
-
-    // Load all 3 fixture files and merge their All_Fixtures sheets
     fixSheets = {};
-    let totalRows = 0;
-    let loadedCount = 0;
-    let lastModified = '';
-    const errors = [];
-
-    for (const filename of DRIVE_FIX_FILES) {
-      try {
-        log(`Drive fixtures: fetching ${filename}...`);
-        const result = await driveDownloadFile(filename, driveAccessToken);
-        if (!result) {
-          log(`Drive fixtures: ${filename} not found — skipping`, 'err');
-          continue;
-        }
-        // Read the All_Fixtures sheet (case-insensitive fallback to first sheet)
-        const sheetKey = Object.keys(result.sheets).find(
-          k => k.toLowerCase().replace(/[\s_]/g,'') === 'allfixtures'
-        ) || Object.keys(result.sheets)[0];
-
-        if (!sheetKey) {
-          log(`Drive fixtures: ${filename} has no sheets — skipping`, 'err');
-          continue;
-        }
-
-        const rows = result.sheets[sheetKey];
-        const key = filename.replace('.xlsx','') + '::All_Fixtures';
-        fixSheets[key] = rows;
-        totalRows += rows.length;
-        loadedCount++;
-        lastModified = result.modified;
-        log(`OK Drive fixtures: ${filename} > ${rows.length} rows (updated ${result.modified})`, 'ok');
-      } catch (e) {
-        errors.push(filename);
-        log(`Drive fixtures error — ${filename}: ${e.message}`, 'err');
+    let totalRows = 0, modified = '';
+    for (const f of files.sort((a, b) => a.name.localeCompare(b.name))) {
+      const res = await driveDownloadById(f, driveAccessToken);
+      modified = res.modified;
+      const stem = f.name.replace(/\.[a-z0-9]+$/i, '');
+      const names = Object.keys(res.sheets);
+      for (const sh of names) {
+        const key = names.length > 1 ? stem + ':' + sh : stem;
+        fixSheets[key] = res.sheets[sh]; totalRows += res.sheets[sh].length;
       }
+      log('OK Drive fixtures: ' + f.name + ' - ' + names.reduce((s, n) => s + res.sheets[n].length, 0) + ' rows', 'ok');
     }
-
-    if (loadedCount === 0) {
-      driveFixStatus('No fixture files found in Drive folder', 'err');
-      log('Drive fixtures: no files loaded', 'err');
-      if (btn) btn.disabled = false;
-      return;
-    }
-
-    driveFixStatus(`OK ${totalRows} fixture${totalRows!==1?'s':''} loaded from ${loadedCount} file${loadedCount!==1?'s':''} (updated ${lastModified})`, 'ok');
-    log(`OK Drive fixtures: ${totalRows} upcoming fixtures from ${loadedCount} file(s)`, 'ok');
-
-    // Update the fixtures panel UI
+    driveFixStatus(totalRows + ' fixture' + (totalRows !== 1 ? 's' : '') + ' loaded (updated ' + modified + ')', 'ok');
     const stB = document.getElementById('stB');
-    if (stB) stB.textContent = `Drive · ${totalRows} fixtures · ${lastModified}`;
+    if (stB) stB.textContent = 'Drive - ' + totalRows + ' fixtures - ' + modified;
     const cardB = document.getElementById('cardB');
     if (cardB) cardB.classList.add('active');
-
     checkReady();
-
   } catch (e) {
     driveFixStatus('Failed to load fixtures: ' + e.message, 'err');
     log('Drive fixtures error: ' + e.message, 'err');
   }
-
   if (btn) btn.disabled = false;
-}
-
-// ── Manual fixture file upload ─────────────────────────────────────
-function manualFixStatus(msg, type) {
-  const el = document.getElementById('manualFixStatus');
-  if (!el) return;
-  el.textContent = msg;
-  el.className = 'drive-status ' + type;
-}
-
-function loadManualFixtures(file) {
-  if (!file) return;
-  manualFixStatus('Reading ' + file.name + '…', 'loading');
-
-  const reader = new FileReader();
-  reader.onload = function(e) {
-    try {
-      const data = new Uint8Array(e.target.result);
-      const wb = XLSX.read(data, { type: 'array' });
-
-      // Merge into fixSheets — manual rows supplement (or override) Drive fixtures
-      if (!fixSheets) fixSheets = {};
-      let addedRows = 0;
-      for (const shName of wb.SheetNames) {
-        const rows = XLSX.utils.sheet_to_json(wb.Sheets[shName], { defval: '', raw: false });
-        const key = '__manual__' + shName;
-        fixSheets[key] = rows;
-        addedRows += rows.length;
-      }
-
-      // Update the card label
-      const stB = document.getElementById('stB');
-      const existingText = stB ? stB.textContent : '';
-      const sep = existingText ? ' + ' : '';
-      if (stB) stB.textContent = existingText + sep + `Manual · ${addedRows} fixtures`;
-      const cardB = document.getElementById('cardB');
-      if (cardB) cardB.classList.add('active');
-
-      // Update label text
-      const lbl = document.getElementById('manualFixLabelText');
-      if (lbl) lbl.textContent = '✓ ' + file.name;
-
-      manualFixStatus(`✓ ${addedRows} fixture${addedRows !== 1 ? 's' : ''} added from ${file.name}`, 'ok');
-      log(`✓ Manual fixtures: ${addedRows} rows loaded from ${file.name}`, 'ok');
-
-      checkReady();
-    } catch (err) {
-      manualFixStatus('Failed to read file: ' + err.message, 'err');
-      log('Manual fixture error: ' + err.message, 'err');
-    }
-  };
-  reader.onerror = () => manualFixStatus('File read error', 'err');
-  reader.readAsArrayBuffer(file);
 }
 
 function loadScript(src) {
@@ -1293,21 +1126,6 @@ function saveSettings() {
     cGamma:       document.getElementById('cGamma').value,
     cDelta:       document.getElementById('cDelta').value,
     confFilter:   document.getElementById('fConf').value,
-    // Filter preferences
-    fLeague:      document.getElementById('fLeague').value,
-    fSearch:      document.getElementById('fSearch').value,
-    fQuality:     document.getElementById('fQuality').value,
-    fHlam:        document.getElementById('fHlam').value,
-    fHlamMax:     document.getElementById('fHlamMax').value,
-    fAlam:        document.getElementById('fAlam').value,
-    fAlamMax:     document.getElementById('fAlamMax').value,
-    fHcs:         document.getElementById('fHcs').value,
-    fAcs:         document.getElementById('fAcs').value,
-    fFormDiff:    document.getElementById('fFormDiff').value,
-    fMbtts:       document.getElementById('fMbtts').value,
-    fMbttsMax:    document.getElementById('fMbttsMax').value,
-    fConservSig:  document.getElementById('fConservSig').value,
-    sortSel:      document.getElementById('sortSel').value,
     savedAt:      new Date().toLocaleString()
   };
   try {
@@ -1355,23 +1173,6 @@ function loadSettings() {
     // Confidence filter
     if (s.confFilter !== undefined) document.getElementById('fConf').value = s.confFilter;
 
-    // Filter preferences
-    if (s.fQuality   !== undefined) document.getElementById('fQuality').value   = s.fQuality;
-    if (s.fSearch    !== undefined) document.getElementById('fSearch').value     = s.fSearch;
-    if (s.fHlam      !== undefined) document.getElementById('fHlam').value       = s.fHlam;
-    if (s.fHlamMax   !== undefined) document.getElementById('fHlamMax').value    = s.fHlamMax;
-    if (s.fAlam      !== undefined) document.getElementById('fAlam').value       = s.fAlam;
-    if (s.fAlamMax   !== undefined) document.getElementById('fAlamMax').value    = s.fAlamMax;
-    if (s.fHcs       !== undefined) document.getElementById('fHcs').value        = s.fHcs;
-    if (s.fAcs       !== undefined) document.getElementById('fAcs').value        = s.fAcs;
-    if (s.fFormDiff  !== undefined) document.getElementById('fFormDiff').value   = s.fFormDiff;
-    if (s.fMbtts     !== undefined) document.getElementById('fMbtts').value      = s.fMbtts;
-    if (s.fMbttsMax  !== undefined) document.getElementById('fMbttsMax').value   = s.fMbttsMax;
-    if (s.fConservSig !== undefined) document.getElementById('fConservSig').value = s.fConservSig;
-    if (s.sortSel    !== undefined) document.getElementById('sortSel').value     = s.sortSel;
-    // Note: fLeague is populated dynamically after analysis runs, so we store and restore it after fillLeagueSelect
-    if (s.fLeague    !== undefined) window._savedLeagueFilter = s.fLeague;
-
     // Refresh all weight display labels
     onWeightChange();
 
@@ -1385,30 +1186,6 @@ function loadSettings() {
     console.warn('Could not load settings:', e);
   }
 }
-
-// ═══════════════════════════════════════════════
-// ═══════════════════════════════════════════════
-// MOBILE SIDEBAR TOGGLE
-// ═══════════════════════════════════════════════
-function toggleSidebar() {
-  const sb = document.getElementById('mainSidebar');
-  const btn = document.getElementById('sbToggle');
-  if (!sb || !btn) return;
-  const isOpen = sb.classList.toggle('sb-open');
-  btn.classList.toggle('open', isOpen);
-}
-
-// Close sidebar when main area is tapped on mobile
-document.addEventListener('click', function(e) {
-  const sb = document.getElementById('mainSidebar');
-  const btn = document.getElementById('sbToggle');
-  if (!sb || !btn) return;
-  if (sb.classList.contains('sb-open') &&
-      !sb.contains(e.target) && !btn.contains(e.target)) {
-    sb.classList.remove('sb-open');
-    btn.classList.remove('open');
-  }
-});
 
 // ═══════════════════════════════════════════════
 // LANDING PAGE — Sport Router
@@ -1449,10 +1226,6 @@ function resetApp() {
   document.getElementById('cardB').classList.remove('active');
   const dfs = document.getElementById('driveFixStatus');
   if (dfs) { dfs.textContent = ''; dfs.className = 'drive-status'; }
-  const mfs = document.getElementById('manualFixStatus');
-  if (mfs) { mfs.textContent = ''; mfs.className = 'drive-status'; }
-  const mfl = document.getElementById('manualFixLabelText');
-  if (mfl) mfl.textContent = 'Upload fixtures .xlsx…';
   document.getElementById('topStats').style.display = 'none';
   document.getElementById('filterSection').style.display = 'none';
   document.getElementById('resultsArea').style.display = 'none';
@@ -1486,11 +1259,11 @@ let allRows = [], visRows = [], loadedFiles = [];
 // ═══════════════════════════════════════════════
 // COLUMN DETECTION
 // ═══════════════════════════════════════════════
-const C_HOME=['HomeTeam','Home Team','home_team','hometeam','home','Home','HT','h team','home team'];
-const C_AWAY=['AwayTeam','Away Team','away_team','awayteam','away','Away','AT','a team','away team'];
-const C_FTHG=['FTHG','fthg','HomeGoals','HG','Home Goals','Score H','GF','home goals','home ft goal','home ft goals','homeftgoal','homeftgoals'];
-const C_FTAG=['FTAG','ftag','AwayGoals','AG','Away Goals','Score A','GA','away goals','away ft goal','away ft goals','awayftgoal','awayftgoals'];
-const C_DATE=['Date','date','DATE','MatchDate','match_date','kick off','kickoff','kick_off','KickOff','Kick Off'];
+const C_HOME=['HomeTeam','Home Team','home_team','hometeam','home','Home','HT','h team'];
+const C_AWAY=['AwayTeam','Away Team','away_team','awayteam','away','Away','AT','a team'];
+const C_FTHG=['FTHG','fthg','HomeGoals','HG','Home Goals','Score H','GF','home goals'];
+const C_FTAG=['FTAG','ftag','AwayGoals','AG','Away Goals','Score A','GA','away goals'];
+const C_DATE=['Date','date','DATE','MatchDate','match_date'];
 const DIV={E0:'Premier League',E1:'Championship',E2:'League One',E3:'League Two',EC:'National League',SC0:'Scottish Prem',SC1:'Scottish Champ',SC2:'Scottish L1',SC3:'Scottish L2',D1:'Bundesliga',D2:'Bundesliga 2',SP1:'La Liga',SP2:'La Liga 2',I1:'Serie A',I2:'Serie B',F1:'Ligue 1',F2:'Ligue 2',B1:'Belgian Pro',N1:'Eredivisie',P1:'Primeira Liga',T1:'Süper Lig',G1:'Super League GR'};
 const divName=s=>DIV[s]||s;
 
@@ -1518,10 +1291,7 @@ function buildMasterIndex(sheets){
     const c=getCols(rows,C_HOME,C_AWAY,null,null);
     if(!c||(!c.home&&!c.away))continue;
     const dateCol=findCol(rows[0],C_DATE);
-    const statusCol=Object.keys(rows[0]).find(k=>k.toLowerCase().replace(/[\s_]/g,'') === 'status') || null;
     for(const r of rows){
-      // Only index teams from finished matches
-      if(statusCol){const st=String(r[statusCol]||'').trim().toUpperCase();if(st&&st!=='FT'&&st!=='AET'&&st!=='PEN')continue;}
       // Only index teams from current season
       const dt=dateCol?String(r[dateCol]||'').trim():'';
       if(dt && !isCurrentSeason(dt)) continue;
@@ -1539,7 +1309,7 @@ function buildMasterIndex(sheets){
 // Only matches on or after this date are used.
 // Updated each season (currently 2025/26).
 // ═══════════════════════════════════════════════
-const SEASON_START = new Date('2025-07-01'); // 1 July 2025 — covers all 2025/26 leagues
+let SEASON_START = new Date('2025-07-01'); // 1 July 2025 — covers all 2025/26 leagues
 
 /**
  * Parse a date string from football-data.co.uk files.
@@ -1550,35 +1320,23 @@ function parseMatchDate(str) {
   if (!str || !str.trim()) return null;
   const s = str.trim();
 
-  // ISO 8601 datetime: YYYY-MM-DDTHH:MM:SS+TZ (e.g. 2026-04-28T18:45:00+00:00)
-  if (/^\d{4}-\d{2}-\d{2}T/.test(s)) return new Date(s);
-
-  // DD/MM/YY — 2-digit year: always treat as DD/MM (football-data.co.uk standard)
-  let m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})$/);
+  // DD/MM/YY or DD/MM/YYYY (most common in football-data.co.uk)
+  let m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
   if (m) {
     let [, d, mo, y] = m;
-    y = parseInt(y) < 50 ? '20' + y : '19' + y;
+    if (y.length === 2) y = parseInt(y) < 50 ? '20' + y : '19' + y;
     return new Date(`${y}-${mo.padStart(2,'0')}-${d.padStart(2,'0')}`);
   }
 
-  // YYYY-MM-DD — ISO, unambiguous
+  // YYYY-MM-DD
   m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (m) return new Date(s);
 
-  // DD/MM/YYYY or MM/DD/YYYY — 4-digit year, disambiguate by value:
-  //   if first part > 12 it can't be a month  → must be DD/MM
-  //   if second part > 12 it can't be a day   → must be MM/DD
-  //   when both <= 12, default to DD/MM (football-data.co.uk convention)
+  // MM/DD/YYYY
   m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (m) {
-    const [, a, b, y] = m;
-    const ai = parseInt(a, 10), bi = parseInt(b, 10);
-    if (bi > 12) {
-      // b can't be a month → format must be MM/DD/YYYY
-      return new Date(`${y}-${a.padStart(2,'0')}-${b.padStart(2,'0')}`);
-    }
-    // Default: DD/MM/YYYY (covers ai > 12 case too, as b is the month)
-    return new Date(`${y}-${b.padStart(2,'0')}-${a.padStart(2,'0')}`);
+    const [, mo, d, y] = m;
+    return new Date(`${y}-${mo.padStart(2,'0')}-${d.padStart(2,'0')}`);
   }
 
   return null;
@@ -1597,12 +1355,8 @@ function buildMatchStore(sheets,idx){
     if(!rows.length)continue;
     const c=getCols(rows,C_HOME,C_AWAY,C_FTHG,C_FTAG);
     if(!c||!c.home||!c.away||!c.fthg||!c.ftag)continue;
-    // Detect status column to skip unfinished matches (NS, PPD, POSTP, etc.)
-    const cStatus = Object.keys(rows[0]).find(k=>k.toLowerCase().replace(/[\s_]/g,'') === 'status') || null;
     for(const r of rows){
       const hR=String(r[c.home]||'').trim(),aR=String(r[c.away]||'').trim();
-      // Skip non-finished matches
-      if(cStatus){const st=String(r[cStatus]||'').trim().toUpperCase();if(st&&st!=='FT'&&st!=='AET'&&st!=='PEN')continue;}
       const hg=parseFloat(r[c.fthg]),ag=parseFloat(r[c.ftag]);
       if(!hR||!aR||isNaN(hg)||isNaN(ag))continue;
       const hC=fuzzy(hR,idx),aC=fuzzy(aR,idx);
@@ -1612,44 +1366,6 @@ function buildMatchStore(sheets,idx){
       if(hC){const k=hC.toLowerCase();en(k);store[k].push({scored:hg,conceded:ag,date:dt,opponent:aC||aR,venue:'H',hg,ag});}
       if(aC){const k=aC.toLowerCase();en(k);store[k].push({scored:ag,conceded:hg,date:dt,opponent:hC||hR,venue:'A',hg,ag});}
     }
-  }
-  // Sort each team's matches chronologically (oldest → newest) so that
-  // slice(-n) always returns the true most-recent N games regardless of
-  // the order sheets were loaded or rows appeared in the source file.
-  for (const k of Object.keys(store)) {
-    store[k].sort((a, b) => {
-      const da = parseMatchDate(a.date), db = parseMatchDate(b.date);
-      if (!da && !db) return 0;
-      if (!da) return -1;
-      if (!db) return  1;
-      return da - db;
-    });
-
-    // Deduplicate: if the same match appears in multiple loaded sheets,
-    // it will have been pushed multiple times. Remove duplicates by
-    // comparing (date, opponent, venue, scored, conceded).
-    // Date must match exactly or within 1 day (to tolerate date-format mismatches
-    // across files). A 2+ day gap always means a different match, even if the
-    // opponent, venue, and score happen to be identical (e.g. back-to-back fixtures).
-    const seen = [];
-    store[k] = store[k].filter(m => {
-      const mDate = parseMatchDate(m.date);
-      const opp = (m.opponent || '').toLowerCase().trim();
-      const isDup = seen.some(s => {
-        // Dates must be close first — this is the primary guard
-        const sd = parseMatchDate(s.date);
-        const dateDiff = (mDate && sd) ? Math.abs(mDate - sd) / 864e5 : null;
-        if (s.date !== m.date) {
-          // If we can parse both dates, require them to be within 1 day
-          if (dateDiff === null || dateDiff > 1) return false;
-        }
-        // Dates match (exact string or ≤1 day apart) — now check match identity
-        return s.opponent === opp && s.venue === m.venue &&
-               s.scored === m.scored && s.conceded === m.conceded;
-      });
-      if (!isDup) seen.push({ date: m.date, opponent: opp, venue: m.venue, scored: m.scored, conceded: m.conceded });
-      return !isDup;
-    });
   }
   return store;
 }
@@ -2229,7 +1945,7 @@ function adjustedTeamLambda(name,n,leagueOSIs,alpha=1.0){
 //        no historical bias, performance-based only.
 // ═══════════════════════════════════════════════════════════════════════
 
-const ELO_K = 32;        // K-factor
+let ELO_K = 32;        // K-factor
 const ELO_BASE = 1000;   // all teams start equal
 
 /**
@@ -3096,8 +2812,8 @@ document.getElementById('runBtn').addEventListener('click',async()=>{
       const valid=rows.filter(r=>{const h=String(r[c.home]||'').trim(),a=String(r[c.away]||'').trim();return h&&h!=='undefined'&&a&&a!=='undefined';});
       log(`"${sh}": ${valid.length} fixture(s)`);
       // detect extra columns from Drive fixtures file
-      const c_kickoff = Object.keys(rows[0]).find(k=>['kickoffutc','kickoff','kick off','kick_off'].includes(k.toLowerCase())) || null;
-      const c_date    = Object.keys(rows[0]).find(k=>['date','kick off','kickoff','kick_off'].includes(k.toLowerCase())) || null;
+      const c_kickoff = Object.keys(rows[0]).find(k=>k.toLowerCase().replace(/[\s_]/g,'') === 'kickoffutc') || null;
+      const c_date    = Object.keys(rows[0]).find(k=>k.toLowerCase() === 'date') || null;
       const c_round   = Object.keys(rows[0]).find(k=>k.toLowerCase() === 'round') || null;
       const c_league  = Object.keys(rows[0]).find(k=>k.toLowerCase() === 'league') || null;
       const c_country = Object.keys(rows[0]).find(k=>k.toLowerCase() === 'country') || null;
@@ -3111,8 +2827,8 @@ document.getElementById('runBtn').addEventListener('click',async()=>{
         // Use Drive-provided league/country if available; otherwise detect from history
         const rowLeague  = c_league  ? String(r[c_league ]||'').trim() : '';
         const rowCountry = c_country ? String(r[c_country]||'').trim() : '';
-        const league = rowLeague || detectLeague(home,away,histSheets,masterIdx);
-        const kickoff= c_kickoff ? String(r[c_kickoff]||'').trim() : '';
+        const league = driveResolveLeague(rowCountry,rowLeague) || detectLeague(home,away,histSheets,masterIdx);
+        const kickoff= c_kickoff ? String(r[c_kickoff]||'').trim() : ((c_date&&r[c_date]&&r['Time'])?String(r[c_date]).trim()+' '+String(r['Time']).trim():'');
         const date   = c_date    ? String(r[c_date   ]||'').trim() : '';
         const round  = c_round   ? String(r[c_round  ]||'').trim() : '';
         const meta   = { kickoff, date, round, country: rowCountry, region: sh };
@@ -3200,8 +2916,8 @@ function applyFilters(){
     if(f.qual==='low'&&!H.low&&!A.low)return false;
     if(f.qual==='found'&&(!H.found||!A.found))return false;
     if(f.qual==='missing'&&H.found&&A.found)return false;
-    if(H.found){if(!isNaN(f.hLam)&&H.lS<f.hLam)return false;if(!isNaN(f.hLamMax)&&H.lS>f.hLamMax)return false;if(!isNaN(f.hCS)&&H.cs>f.hCS)return false;}
-    if(A.found){if(!isNaN(f.aLam)&&A.lS<f.aLam)return false;if(!isNaN(f.aLamMax)&&A.lS>f.aLamMax)return false;if(!isNaN(f.aCS)&&A.cs>f.aCS)return false;}
+    if(H.found){if(!isNaN(f.hLam)&&H.lS<f.hLam)return false;if(!isNaN(f.hLamMax)&&H.lS>f.hLamMax)return false;if(!isNaN(f.hCS)&&H.cs<f.hCS)return false;}
+    if(A.found){if(!isNaN(f.aLam)&&A.lS<f.aLam)return false;if(!isNaN(f.aLamMax)&&A.lS>f.aLamMax)return false;if(!isNaN(f.aCS)&&A.cs<f.aCS)return false;}
     if(!isNaN(f.formDiffMin)&&(r.formDiff===null||Math.abs(r.formDiff)<f.formDiffMin))return false;
     if(!isNaN(f.minConf)&&(ensMode!=='ensemble'||!r.conf||r.conf.pct<f.minConf))return false;
     if(f.conservSig&&r.conservSig&&r.conservSig.sig!==f.conservSig)return false;
@@ -3255,11 +2971,6 @@ function fillLeagueSelect(rows){
   const ls=[...new Set(rows.map(r=>r.league))].sort();
   sel.innerHTML='<option value="">All Leagues</option>';
   ls.forEach(l=>{const o=document.createElement('option');o.value=l;o.textContent=l;sel.appendChild(o);});
-  // Restore saved league filter if present
-  if (window._savedLeagueFilter) {
-    sel.value = window._savedLeagueFilter;
-    window._savedLeagueFilter = null;
-  }
 }
 
 // ═══════════════════════════════════════════════
@@ -3715,12 +3426,6 @@ document.getElementById('gamesBtn').addEventListener('click',()=>{
   a.download='fixtures.txt';a.click();
 });
 
-// ── Manual fixture file input listener ────────────
-document.getElementById('manualFixFile').addEventListener('change', function() {
-  if (this.files && this.files[0]) loadManualFixtures(this.files[0]);
-  this.value = ''; // allow re-upload of same file
-});
-
 // ── Resizable fixture column ───────────────────────
 (function(){
   const handle = document.getElementById('fixResizeHandle');
@@ -3746,6 +3451,533 @@ document.getElementById('manualFixFile').addEventListener('change', function() {
     document.addEventListener('mouseup', onUp);
   });
 })();
+</script>
+<script>
+/* =====================================================================
+   BACKTEST MODULE  (walk-forward test of the existing prediction model)
+   - Reuses the app's own functions (calcFixture, buildEloRatings, ...)
+   - Never touches the Predictions page state: globals are swapped and restored
+   ===================================================================== */
+(function(){
+'use strict';
+const $ = id => document.getElementById(id);
+const BT = window.BT = { matches:[], leagues:[], recs:null, cfgKey:'', busy:false, folders:{} };
+
+/* ------------------------- parsing ------------------------- */
+function parseCSV(text){
+  if(text.charCodeAt(0)===0xFEFF) text=text.slice(1);
+  const rows=[]; let row=[],cur='',q=false;
+  for(let i=0;i<text.length;i++){
+    const ch=text[i];
+    if(q){ if(ch==='"'){ if(text[i+1]==='"'){cur+='"';i++;} else q=false; } else cur+=ch; }
+    else if(ch==='"') q=true;
+    else if(ch===','){ row.push(cur); cur=''; }
+    else if(ch==='\n'||ch==='\r'){ if(ch==='\r'&&text[i+1]==='\n') i++; row.push(cur); cur=''; if(row.length>1||row[0]!=='') rows.push(row); row=[]; }
+    else cur+=ch;
+  }
+  if(cur!==''||row.length){ row.push(cur); if(row.length>1||row[0]!=='') rows.push(row); }
+  if(!rows.length) return [];
+  const head=rows.shift().map(h=>h.trim());
+  return rows.map(r=>{ const o={}; head.forEach((h,i)=>{ o[h]=r[i]!==undefined?r[i].trim():''; }); return o; });
+}
+const norm = s => String(s).toLowerCase().replace(/[\s_]/g,'');
+function colMap(sample){ const m={}; for(const k of Object.keys(sample)) m[norm(k)]=k; return m; }
+function pick(m){ for(let i=1;i<arguments.length;i++){ const k=m[norm(arguments[i])]; if(k) return k; } return null; }
+function toDate(v){
+  if(Object.prototype.toString.call(v)==='[object Date]'){ if(isNaN(v)) return null; const d=new Date(v.getTime()+12*3600e3); return new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())); }
+  if(typeof v==='number' && v>20000 && v<80000) return new Date(Date.UTC(1899,11,30)+Math.round(v)*864e5);
+  const s=String(v==null?'':v).trim(); if(!s) return null;
+  let m=s.match(/^(\d{4})-(\d{2})-(\d{2})/); if(m) return new Date(Date.UTC(+m[1],+m[2]-1,+m[3]));
+  m=s.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})/);
+  if(m){ let y=+m[3]; if(y<100) y+=y<50?2000:1900; return new Date(Date.UTC(y,+m[2]-1,+m[1])); }
+  return null;
+}
+function seasonTag(s){
+  s=String(s||'').trim(); let m=s.match(/^(\d{4})\s*[\/-]\s*(\d{2,4})$/);
+  if(m) return m[1].slice(2)+m[2].slice(-2);
+  m=s.match(/^(\d{4})$/); if(m) return m[1];
+  return '';
+}
+function seasonFromDate(d){ const y=d.getUTCFullYear(), st=d.getUTCMonth()>=6?y:y-1; return String(st).slice(2)+String(st+1).slice(2); }
+const num = v => { const x=parseFloat(v); return isFinite(x)&&x>1?x:null; };
+function firstOdds(r,cm,sets){
+  for(const set of sets){
+    const vals=set.map(n=>{ const k=pick(cm,n); return k?num(r[k]):null; });
+    if(vals.every(v=>v!==null)) return vals;
+  }
+  return null;
+}
+const SETS_1X2=[['AvgH','AvgD','AvgA'],['AvgCH','AvgCD','AvgCA'],['B365H','B365D','B365A'],['B365CH','B365CD','B365CA'],['PSH','PSD','PSA'],['PSCH','PSCD','PSCA'],['MaxH','MaxD','MaxA'],['MaxCH','MaxCD','MaxCA']];
+const SETS_OU=[['Avg>2.5','Avg<2.5'],['AvgC>2.5','AvgC<2.5'],['B365>2.5','B365<2.5'],['B365C>2.5','B365C<2.5'],['P>2.5','P<2.5'],['Max>2.5','Max<2.5']];
+
+function ingest(rows,fileName,folderName){
+  if(!rows.length) return 0;
+  const cm=colMap(rows[0]);
+  const kH=pick(cm,'HomeTeam','Home'), kA=pick(cm,'AwayTeam','Away'), kHG=pick(cm,'FTHG','HG'), kAG=pick(cm,'FTAG','AG'), kD=pick(cm,'Date');
+  if(!(kH&&kA&&kHG&&kAG&&kD)) return 0;
+  const kDiv=pick(cm,'Div'), kSeason=pick(cm,'Season'), kCountry=pick(cm,'Country'), kLeague=pick(cm,'League');
+  const fy=fileName.match(/(\d{4})[-_](\d{4})/);
+  const fileTag=(fy?fy[1].slice(2)+fy[2].slice(2):'') || (fileName.match(/_(\d{4})\.[a-z]+$/i)||[])[1] || (String(folderName||'').match(/(\d{4})$/)||[])[1] || '';
+  const stem=fileName.replace(/\.[a-z0-9]+$/i,'').replace(/_?\d{4}$/,'');
+  let n=0;
+  for(const r of rows){
+    const home=String(r[kH]==null?'':r[kH]).trim(), away=String(r[kA]==null?'':r[kA]).trim();
+    const hg=parseFloat(r[kHG]), ag=parseFloat(r[kAG]);
+    const d=toDate(r[kD]);
+    if(!home||!away||!isFinite(hg)||!isFinite(ag)||!d) continue;
+    let league;
+    if(kDiv&&r[kDiv]) league=divName(String(r[kDiv]).trim());
+    else if(kLeague&&r[kLeague]) league=((kCountry&&r[kCountry])?r[kCountry]+' ':'')+r[kLeague];
+    else league=stem;
+    league=String(league).replace(/\s+/g,' ').trim();
+    const season=(kSeason&&r[kSeason]?seasonTag(r[kSeason]):'')||fileTag||seasonFromDate(d);
+    const key=league+'|'+d.getTime()+'|'+home.toLowerCase()+'|'+away.toLowerCase();
+    if(BT.keys.has(key)) continue; BT.keys.add(key);
+    BT.matches.push({ league, season, t:d.getTime(), ds:d.toISOString().slice(0,10), home, away, hg, ag,
+      o1x2:firstOdds(r,cm,SETS_1X2), ou:firstOdds(r,cm,SETS_OU) });
+    n++;
+  }
+  return n;
+}
+
+/* group into leagues, rank seasons newest-first, keep latest 3 */
+function finalize(){
+  const by={};
+  for(const m of BT.matches){ (by[m.league]=by[m.league]||[]).push(m); }
+  BT.leagues=[];
+  for(const [label,all] of Object.entries(by)){
+    const seas={};
+    for(const m of all){ const s=seas[m.season]=seas[m.season]||{tag:m.season,min:Infinity,max:-Infinity,count:0}; s.min=Math.min(s.min,m.t); s.max=Math.max(s.max,m.t); s.count++; }
+    const seasons=Object.values(seas).sort((a,b)=>b.max-a.max).slice(0,3);
+    const keep=new Set(seasons.map(s=>s.tag));
+    const ms=all.filter(m=>keep.has(m.season)).sort((a,b)=>a.t-b.t);
+    ms.forEach(m=>{ m.row={Date:m.ds,HomeTeam:m.home,AwayTeam:m.away,FTHG:m.hg,FTAG:m.ag}; });
+    BT.leagues.push({label,seasons,matches:ms});
+  }
+  const newest=Math.max(0,...BT.leagues.map(L=>L.matches.length?L.matches[L.matches.length-1].t:0));
+  BT.leagues=BT.leagues.filter(L=>L.matches.length>=30&&(newest-L.matches[L.matches.length-1].t)<400*864e5);
+  BT.leagues.sort((a,b)=>a.label.localeCompare(b.label));
+  BT.recs=null; renderData(); renderOut();
+}
+
+/* ------------------------- model run ------------------------- */
+const tick = () => new Promise(r=>setTimeout(r,0));
+function scoreMatrix(lH,lA,rho){
+  let tot=0,pH=0,pD=0,pA=0,o25=0;
+  for(let x=0;x<=10;x++){ const px=poissonPMF(x,lH);
+    for(let y=0;y<=10;y++){
+      const p=px*poissonPMF(y,lA)*dcTau(x,y,lH,lA,rho);
+      if(!(p>0)) continue; tot+=p;
+      if(x>y) pH+=p; else if(x===y) pD+=p; else pA+=p;
+      if(x+y>=3) o25+=p;
+    } }
+  return tot>0?{pH:pH/tot,pD:pD/tot,pA:pA/tot,o25:o25/tot}:null;
+}
+function lowerBound(arr,t){ let lo=0,hi=arr.length; while(lo<hi){ const mid=(lo+hi)>>1; if(arr[mid].t<t) lo=mid+1; else hi=mid; } return lo; }
+
+async function runModel(cfg,onProg){
+  const S={histSheets,masterIdx,matchStore,_leagueOSIs,_leagueParams,_teamRatings,_eloRatings,_leagueFreqStats,osiMode,SEASON_START,ELO_K,getWeights,getConfWeights};
+  const recs=[]; let skipped=0;
+  const jobs=[];
+  for(const L of BT.leagues){ if(cfg.only&&!cfg.only.has(L.label)) continue; for(const rank of cfg.ranks){ const s=L.seasons[rank]; if(s) jobs.push({L,rank,s}); } }
+  try{
+    SEASON_START=new Date('1990-01-01'); osiMode=cfg.osi; ELO_K=cfg.eloK;
+    getWeights=()=>({wPoisson:.5,wElo:.3,wForm:.2}); getConfWeights=()=>({alpha:.35,beta:.3,gamma:.2,delta:.15});
+    let done=0;
+    for(const {L,rank,s} of jobs){
+      const test=L.matches.filter(m=>m.season===s.tag);
+      const prev=L.seasons[rank+1];
+      const winStart=(cfg.hist==='prev'&&prev)?prev.min:s.min;
+      let i=0;
+      while(i<test.length){
+        const cutoff=test[i].t, end=cutoff+cfg.batchDays*864e5;
+        let j=i; while(j<test.length&&test[j].t<end) j++;
+        const a=lowerBound(L.matches,winStart), b=lowerBound(L.matches,cutoff);
+        if(b-a>=10){
+          histSheets={[L.label]:L.matches.slice(a,b).map(m=>m.row)};
+          masterIdx=buildMasterIndex(histSheets);
+          matchStore=buildMatchStore(histSheets,masterIdx);
+          _leagueFreqStats=computeLeagueFreqStats(matchStore);
+          _leagueOSIs=buildLeagueOSIs(cfg.n,cfg.alpha);
+          _leagueParams=buildLeagueParams(cfg.n,cfg.alpha);
+          _teamRatings=buildTeamRatings(cfg.n,_leagueParams,cfg.alpha);
+          _eloRatings=buildEloRatings();
+          for(let k=i;k<j;k++){
+            const g=test[k];
+            if(getTeamMatches(g.home).length<cfg.warm||getTeamMatches(g.away).length<cfg.warm){ skipped++; continue; }
+            let res; try{ res=calcFixture(L.label,g.home,g.away,cfg.n,cfg.alpha,{date:g.ds}); }catch(e){ skipped++; continue; }
+            if(!(res.H.found&&res.A.found)||res.mBTTS===null){ skipped++; continue; }
+            const lH=res.dcLambdas?res.dcLambdas.lambdaHome:res.H.lS, lA=res.dcLambdas?res.dcLambdas.lambdaAway:res.A.lS;
+            const sm=scoreMatrix(lH,lA,res.rho);
+            recs.push({ league:L.label, season:s.tag, rank, date:g.ds, home:g.home, away:g.away, hg:g.hg, ag:g.ag,
+              mB:res.mBTTS, fB:(res.formH.bttsFactor+res.formA.bttsFactor)/2, elo:res.eloProbs, slope:(res.formH&&res.formH.slope)||0,
+              pm:sm, ou:res.conservOU, comp:res.conf.components, o1x2:g.o1x2, ouOdds:g.ou, lT:res.lambdaTotal });
+          }
+        } else skipped+=j-i;
+        i=j;
+        if(onProg&&(i%7===0||i>=test.length)){ onProg(done/jobs.length+ (i/test.length)/jobs.length); await tick(); }
+      }
+      done++;
+    }
+  } finally {
+    histSheets=S.histSheets; masterIdx=S.masterIdx; matchStore=S.matchStore; _leagueOSIs=S._leagueOSIs; _leagueParams=S._leagueParams;
+    _teamRatings=S._teamRatings; _eloRatings=S._eloRatings; _leagueFreqStats=S._leagueFreqStats; osiMode=S.osiMode; SEASON_START=S.SEASON_START;
+    ELO_K=S.ELO_K; getWeights=S.getWeights; getConfWeights=S.getConfWeights;
+  }
+  return {recs,skipped};
+}
+
+/* ------------------------- evaluation (instant, no model re-run) ------------------------- */
+const EPS=1e-6, clip=p=>Math.min(1-EPS,Math.max(EPS,p));
+function confScore(c,cw){ return (cw.alpha*c.dataQuality+cw.beta*c.modelAgreement+cw.gamma*c.signalStrength+cw.delta*c.stability)/100; }
+function bin(ps,ys){
+  const n=ps.length; if(!n) return null;
+  let hit=0,br=0,ll=0,base=0;
+  for(let i=0;i<n;i++){ const p=clip(ps[i]),y=ys[i]; if((p>=.5)===(y===1)) hit++; br+=(p-y)**2; ll+=-(y?Math.log(p):Math.log(1-p)); base+=y; }
+  const b=clip(base/n); const bll=-(b*Math.log(b)+(1-b)*Math.log(1-b));
+  return {n,acc:hit/n,brier:br/n,ll:ll/n,rate:base/n,baseLL:bll};
+}
+function evaluate(recs,post){
+  const w=post.w;
+  const D=recs.map(r=>{
+    const ensB=(r.mB!==null&&r.fB!==null)?fuseBTTS(r.mB,r.fB,w):r.mB;
+    const eo=r.elo?fuseOutcomes(r.elo,{slope:r.slope},w):null;
+    return {r,pB:post.bttsMode==='poisson'?r.mB:ensB, eo, conf:confScore(r.comp,post.cw), y:(r.hg>0&&r.ag>0)?1:0, tot:r.hg+r.ag, res:r.hg>r.ag?0:r.hg===r.ag?1:2};
+  });
+  const out={n:D.length,D};
+  out.btts=bin(D.map(d=>d.pB),D.map(d=>d.y));
+  out.bttsPoisson=bin(D.map(d=>d.r.mB),D.map(d=>d.y));
+  out.ou25=bin(D.map(d=>d.r.pm?d.r.pm.o25:null).filter(v=>v!==null),D.filter(d=>d.r.pm).map(d=>d.tot>=3?1:0));
+  // 1X2
+  const X=D.filter(d=>d.eo); let hit=0,br=0,ll=0; const cnt=[0,0,0];
+  for(const d of X){ const p=[d.eo.hw,d.eo.draw,d.eo.aw]; const pc=p.map(clip); let am=0; for(let k=1;k<3;k++) if(p[k]>p[am]) am=k;
+    if(am===d.res) hit++; for(let k=0;k<3;k++) br+=(p[k]-(k===d.res?1:0))**2; ll+=-Math.log(pc[d.res]); cnt[d.res]++; }
+  if(X.length){ const f=cnt.map(c=>c/X.length); out.x12={n:X.length,acc:hit/X.length,brier:br/X.length,ll:ll/X.length,baseLL:-f.reduce((s,v)=>s+(v>0?v*Math.log(v):0),0),homeRate:f[0]}; }
+  // 1X2 from Poisson matrix (for comparison)
+  const P=D.filter(d=>d.r.pm); if(P.length){ let h2=0,l2=0; for(const d of P){ const p=[d.r.pm.pH,d.r.pm.pD,d.r.pm.pA]; let am=0; for(let k=1;k<3;k++) if(p[k]>p[am]) am=k; if(am===d.res) h2++; l2+=-Math.log(clip(p[d.res])); } out.x12p={n:P.length,acc:h2/P.length,ll:l2/P.length}; }
+  // bookmaker benchmark on same games
+  const B=X.filter(d=>d.r.o1x2); if(B.length){ let lb=0,lm=0,hb=0,hm=0; for(const d of B){ const inv=d.r.o1x2.map(o=>1/o); const s=inv[0]+inv[1]+inv[2]; const pb=inv.map(v=>v/s);
+      lb+=-Math.log(clip(pb[d.res])); lm+=-Math.log(clip([d.eo.hw,d.eo.draw,d.eo.aw][d.res]));
+      let am=0; for(let k=1;k<3;k++) if(pb[k]>pb[am]) am=k; if(am===d.res) hb++; const pm=[d.eo.hw,d.eo.draw,d.eo.aw]; let a2=0; for(let k=1;k<3;k++) if(pm[k]>pm[a2]) a2=k; if(a2===d.res) hm++; }
+    out.book={n:B.length,llBook:lb/B.length,llModel:lm/B.length,accBook:hb/B.length,accModel:hm/B.length}; }
+  // conservative signals
+  const sig=(thr)=>{ let n=0,h=0,pp=0; for(const d of D){ if(d.r.ou.over35>=thr){ n++; h+=d.tot>=4?1:0; pp+=d.r.ou.over35; } } return {n,hit:n?h/n:null,avgP:n?pp/n:null}; };
+  const sigU=(thr)=>{ let n=0,h=0,pp=0; for(const d of D){ if(d.r.ou.under15>=thr){ n++; h+=d.tot<=1?1:0; pp+=d.r.ou.under15; } } return {n,hit:n?h/n:null,avgP:n?pp/n:null}; };
+  out.over=sig(post.over35); out.under=sigU(post.under15);
+  out.sweep=[0.35,0.40,0.45,0.50,0.55,0.60,0.65,0.70].map(t=>({t,o:sig(t),u:sigU(t)}));
+  // confidence bands (BTTS accuracy)
+  out.bands=['HIGH','MED','LOW'].map(lbl=>{ const s=D.filter(d=>{const p=d.conf*100; return lbl==='HIGH'?p>=65:lbl==='MED'?(p>=40&&p<65):p<40;}); return {lbl,...(bin(s.map(d=>d.pB),s.map(d=>d.y))||{n:0})}; });
+  // ROI
+  const edge=post.edge; const roi={x12:{n:0,win:0,profit:0},ou:{n:0,win:0,profit:0},byEdge:[]};
+  const buckets=[[0.05,0.10],[0.10,0.20],[0.20,9]].map(b=>({lo:b[0],hi:b[1],n:0,profit:0}));
+  for(const d of D){
+    if(d.eo&&d.r.o1x2){ const p=[d.eo.hw,d.eo.draw,d.eo.aw]; let bk=-1,be=-1; for(let k=0;k<3;k++){ const e=p[k]*d.r.o1x2[k]-1; if(e>be){be=e;bk=k;} }
+      if(be>=edge){ const pr=(bk===d.res?d.r.o1x2[bk]-1:-1); roi.x12.n++; roi.x12.profit+=pr; if(bk===d.res) roi.x12.win++; for(const b of buckets) if(be>=b.lo&&be<b.hi){ b.n++; b.profit+=pr; } } }
+    if(d.r.pm&&d.r.ouOdds){ const po=d.r.pm.o25, eo2=po*d.r.ouOdds[0]-1, eu=(1-po)*d.r.ouOdds[1]-1; const over=eo2>=eu; const e=over?eo2:eu;
+      if(e>=edge){ const won=over?d.tot>=3:d.tot<=2; roi.ou.n++; roi.ou.profit+=won?(over?d.r.ouOdds[0]:d.r.ouOdds[1])-1:-1; if(won) roi.ou.win++; } }
+  }
+  roi.byEdge=buckets; out.roi=roi;
+  // calibration
+  const cal=(ps,ys)=>{ const b=Array.from({length:10},()=>({n:0,p:0,y:0})); ps.forEach((p,i)=>{ const k=Math.min(9,Math.floor(p*10)); b[k].n++; b[k].p+=p; b[k].y+=ys[i]; }); return b; };
+  out.calB=cal(D.map(d=>d.pB),D.map(d=>d.y));
+  out.calO=cal(D.filter(d=>d.r.pm).map(d=>d.r.pm.o25),D.filter(d=>d.r.pm).map(d=>d.tot>=3?1:0));
+  out.calH=cal(X.map(d=>d.eo.hw),X.map(d=>d.res===0?1:0));
+  // do predicted goal totals track actual goals?
+  const T=D.filter(d=>d.r.lT!=null&&isFinite(d.r.lT)).sort((a,b)=>a.r.lT-b.r.lT); out.spread=[];
+  if(T.length>=25) for(let i=0;i<5;i++){ const part=T.slice(Math.floor(i*T.length/5),Math.floor((i+1)*T.length/5)); out.spread.push({pred:part.reduce((s,d)=>s+d.r.lT,0)/part.length,act:part.reduce((s,d)=>s+d.tot,0)/part.length,n:part.length}); }
+  // by league
+  const lg={}; for(const d of D){ (lg[d.r.league]=lg[d.r.league]||[]).push(d); }
+  out.leagues=Object.entries(lg).map(([name,ds])=>{ const b=bin(ds.map(d=>d.pB),ds.map(d=>d.y)); const xs=ds.filter(d=>d.eo); let h=0; for(const d of xs){ const p=[d.eo.hw,d.eo.draw,d.eo.aw]; let am=0; for(let k=1;k<3;k++) if(p[k]>p[am]) am=k; if(am===d.res) h++; }
+    const o=bin(ds.filter(d=>d.r.pm).map(d=>d.r.pm.o25),ds.filter(d=>d.r.pm).map(d=>d.tot>=3?1:0));
+    return {name,n:ds.length,btts:b.acc,bttsLL:b.ll,x12:xs.length?h/xs.length:null,ou:o?o.acc:null}; }).sort((a,b)=>b.n-a.n);
+  return out;
+}
+/* single number to minimise (lower is better); <1 means "beats the naive base-rate model" */
+function objective(ev,which){
+  const rel={ btts:ev.btts&&ev.btts.ll/ev.btts.baseLL, x12:ev.x12&&ev.x12.ll/ev.x12.baseLL, ou25:ev.ou25&&ev.ou25.ll/ev.ou25.baseLL };
+  if(which!=='blend') return rel[which]==null?Infinity:rel[which];
+  const v=[rel.btts,rel.x12,rel.ou25].filter(x=>x!=null&&isFinite(x)); return v.length?v.reduce((s,x)=>s+x,0)/v.length:Infinity;
+}
+
+/* ------------------------- optimiser ------------------------- */
+async function optimise(base,post,which,onStatus,onProg){
+  const log=[]; let cfg={...base,ranks:[1]};
+  const score=async(c)=>{ const {recs}=await runModel(c,null); return recs.length?objective(evaluate(recs,post),which):Infinity; };
+  const stages=[
+    {name:'History window (N) x recency',  cand:()=>{ const o=[]; for(const n of [10,16,24,40]) for(const a of [.85,1.0]) o.push({n,alpha:a}); return o; }},
+    {name:'History window',                cand:()=>[{hist:'same'},{hist:'prev'}]},
+    {name:'Elo K-factor',                  cand:()=>[16,24,32,48].map(k=>({eloK:k}))}
+  ];
+  let total=stages.reduce((s,st)=>s+st.cand().length,0), done=0;
+  for(const st of stages){
+    let best=null;
+    for(const c of st.cand()){
+      onStatus(st.name+' ...'); const trial={...cfg,...c}; const sc=await score(trial); done++; onProg(done/total);
+      log.push({stage:st.name,params:c,score:sc}); if(best===null||sc<best.sc) best={sc,c};
+    }
+    if(best&&isFinite(best.sc)) cfg={...cfg,...best.c};
+    await tick();
+  }
+  // cheap post-hoc stage: ensemble weights on the tuning season
+  onStatus('Ensemble weights ...');
+  const {recs:tuneRecs}=await runModel(cfg,null);
+  let bestW=null;
+  for(const wP of [30,40,50,60,70,80]) for(const wF of [0,10,20,30,40]){ const wE=100-wP-wF; if(wE<0) continue;
+    const tot=100; const w={wPoisson:wP/tot,wElo:wE/tot,wForm:wF/tot};
+    const sc=objective(evaluate(tuneRecs,{...post,w}),which); if(bestW===null||sc<bestW.sc) bestW={sc,wP,wE,wF,w}; }
+  return {cfg:{n:cfg.n,alpha:cfg.alpha,eloK:cfg.eloK,hist:cfg.hist},weights:bestW,log,tuneScore:bestW.sc};
+}
+
+/* ------------------------- Google Drive loading ------------------------- */
+async function dfetch(url,asBuffer){
+  let res=await fetch(url,{headers:{Authorization:'Bearer '+driveAccessToken}});
+  if(res.status===401){ driveAccessToken=await getGoogleAccessToken(); res=await fetch(url,{headers:{Authorization:'Bearer '+driveAccessToken}}); }
+  if(!res.ok) throw new Error('Drive HTTP '+res.status);
+  return asBuffer?res.arrayBuffer():res.json();
+}
+async function findFolder(name){
+  const q=encodeURIComponent("name='"+name.replace(/'/g,"\\'")+"' and mimeType='application/vnd.google-apps.folder' and trashed=false");
+  const d=await dfetch('https://www.googleapis.com/drive/v3/files?q='+q+'&fields=files(id,name,parents)&pageSize=20');
+  if(!d.files||!d.files.length) return null;
+  const pref=d.files.find(f=>(f.parents||[]).includes(DRIVE_FOLDER_ID)); return (pref||d.files[0]).id;
+}
+async function listFiles(id){
+  let out=[],tok='';
+  do{ const q=encodeURIComponent("'"+id+"' in parents and trashed=false");
+    const d=await dfetch('https://www.googleapis.com/drive/v3/files?q='+q+'&fields=nextPageToken,files(id,name,mimeType)&pageSize=1000'+(tok?'&pageToken='+tok:''));
+    out=out.concat(d.files||[]); tok=d.nextPageToken||''; }while(tok);
+  return out;
+}
+async function loadParsed(file,folder){
+  const isSheet=file.mimeType==='application/vnd.google-apps.spreadsheet';
+  const isCsv=/\.csv$/i.test(file.name), isX=/\.xlsx?$/i.test(file.name);
+  if(!isSheet&&!isCsv&&!isX) return 0;
+  const url=isSheet?'https://www.googleapis.com/drive/v3/files/'+file.id+'/export?mimeType='+encodeURIComponent('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+                   :'https://www.googleapis.com/drive/v3/files/'+file.id+'?alt=media';
+  const buf=await dfetch(url,true);
+  return parseBuffer(buf,isCsv?file.name:file.name.replace(/(\.xlsx?)?$/i,'.xlsx'),folder);
+}
+function parseBuffer(buf,name,folder){
+  let added=0;
+  if(/\.csv$/i.test(name)) added=ingest(parseCSV(new TextDecoder('utf-8').decode(buf)),name,folder);
+  else { const wb=XLSX.read(buf,{type:'array',cellDates:true}); for(const sn of wb.SheetNames) added+=ingest(XLSX.utils.sheet_to_json(wb.Sheets[sn],{defval:''}),name,folder); }
+  return added;
+}
+async function loadDrive(){
+  const st=$('btDriveStatus'), btn=$('btDriveBtn'); btn.disabled=true;
+  const set=(m,c)=>{ st.textContent=m; st.className='drive-status '+(c||''); };
+  try{
+    let folder=$('btFolderId').value.trim(); const mm=folder.match(/folders\/([\w-]+)/); if(mm) folder=mm[1];
+    if(!folder){ set('Enter the Drive folder ID','err'); btn.disabled=false; return; }
+    const skip=$('btSkip').value.split(',').map(x=>x.trim().toLowerCase()).filter(Boolean);
+    try{ localStorage.setItem('btDrive',JSON.stringify({folder,skip:$('btSkip').value})); }catch(e){}
+    set('Signing in to Google...','loading');
+    if(!window.google||!window.google.accounts) await loadScript('https://accounts.google.com/gsi/client');
+    if(!driveAccessToken) driveAccessToken=await getGoogleAccessToken();
+    BT.matches=[]; BT.keys=new Set();
+    set('Listing files...','loading');
+    const list=(await listFiles(folder)).filter(f=>!skip.some(k=>f.name.toLowerCase().includes(k)));
+    let files=0; const empty=[];
+    for(const f of list){
+      if(!/\.(csv|xlsx|xls)$/i.test(f.name)&&f.mimeType!=='application/vnd.google-apps.spreadsheet') continue;
+      set('Reading '+f.name+' ...','loading');
+      try{ const added=await loadParsed(f,''); files++; if(!added) empty.push(f.name); }catch(e){ console.warn(f.name,e); empty.push(f.name); }
+      await tick();
+    }
+    if(!files){ set('No spreadsheet files found in that folder (or all were skipped)','err'); btn.disabled=false; return; }
+    finalize(); set('Loaded '+BT.matches.length.toLocaleString()+' games from '+files+' files'+(empty.length?' ('+empty.length+' had no usable results: '+empty.slice(0,3).join(', ')+(empty.length>3?'...':'')+')':''),'ok');
+  }catch(e){ set('Failed: '+e.message,'err'); }
+  btn.disabled=false;
+}
+async function loadLocal(fileList){
+  if(!BT.keys){ BT.matches=[]; BT.keys=new Set(); }
+  const bad=[];
+  for(const f of fileList){ try{ const buf=await f.arrayBuffer(); if(!parseBuffer(buf,f.name,'')) bad.push(f.name); }catch(e){ console.warn(f.name,e); bad.push(f.name); } await tick(); }
+  finalize(); const st=$('btDriveStatus'); st.textContent='Loaded '+BT.matches.length.toLocaleString()+' games'+(bad.length?' - no usable results in: '+bad.join(', '):''); st.className='drive-status '+(bad.length?'err':'ok');
+}
+
+/* ------------------------- settings plumbing ------------------------- */
+const val=(id,def)=>{ const e=$(id); const v=e?parseFloat(e.value):NaN; return isFinite(v)?v:def; };
+function modelCfg(){
+  const s=$('btSeasons').value;
+  return { n:val('btN',10), alpha:val('btAlpha',85)/100, osi:'raw', eloK:val('btEloK',32), warm:val('btWarm',5), batchDays:val('btBatch',7), hist:$('btHist').value,
+           ranks:s==='cur'?[0]:s==='last'?[1]:[0,1] };
+}
+function postCfg(){
+  const p=val('btWP',50),e=val('btWE',30),f=val('btWF',20),t=Math.max(1,p+e+f);
+  const a=val('btCA',35),b=val('btCB',30),g=val('btCG',20),d=val('btCD',15),tc=Math.max(1,a+b+g+d);
+  return { w:{wPoisson:p/t,wElo:e/t,wForm:f/t}, cw:{alpha:a/tc,beta:b/tc,gamma:g/tc,delta:d/tc},
+           over35:val('btO35',55)/100, under15:val('btU15',55)/100, edge:val('btEdge',5)/100, bttsMode:$('btMode').value };
+}
+const cfgKey=()=>JSON.stringify(modelCfg());
+function copyFromPredictions(){
+  const g=(id,def)=>{ const e=document.getElementById(id); return e&&e.value!==''?e.value:def; };
+  const set=(id,v)=>{ const e=$(id); if(e) e.value=v; };
+  set('btN',g('nSlider',10)); set('btAlpha',g('decaySlider',85)); set('btEloK',ELO_K);
+  set('btWP',g('wPoisson',50)); set('btWE',g('wElo',30)); set('btWF',g('wForm',20));
+  set('btCA',g('cAlpha',35)); set('btCB',g('cBeta',30)); set('btCG',g('cGamma',20)); set('btCD',g('cDelta',15));
+  set('btO35',Math.round(OVER35_THRESHOLD*100)); set('btU15',Math.round(UNDER15_THRESHOLD*100));
+  set('btMode',ensMode==='ensemble'?'ens':'poisson'); syncLabels(); onChange();
+}
+function applyToPredictions(c,w){
+  const set=(id,v)=>{ const e=document.getElementById(id); if(e){ e.value=v; e.dispatchEvent(new Event('input',{bubbles:true})); } };
+  set('decaySlider',Math.round(c.alpha*100));
+  const ns=document.getElementById('nSlider'); if(ns&&c.n>+ns.max) ns.max=c.n; set('nSlider',c.n);
+  ELO_K=c.eloK;
+  if(w){ set('wPoisson',w.wP); set('wElo',w.wE); set('wForm',w.wF); onWeightChange(); }
+  const m=$('btApplyMsg'); if(m) m.textContent='Applied to the Predictions page. Go back there and hit Save Settings to keep them.'+(c.hist==='same'?' History window "this season only" also needs SEASON_START in the code set to the current season start.':'');
+}
+function syncLabels(){
+  const L=(id,fmt)=>{ const e=$(id),o=$(id+'V'); if(e&&o) o.textContent=fmt?fmt(e.value):e.value; };
+  ['btN','btWP','btWE','btWF','btCA','btCB','btCG','btCD'].forEach(id=>L(id));
+  L('btAlpha',v=>(v/100).toFixed(2)); L('btO35',v=>(v/100).toFixed(2)); L('btU15',v=>(v/100).toFixed(2));
+  const s=val('btWP',0)+val('btWE',0)+val('btWF',0); const e=$('btWSum'); if(e){ e.textContent='sum '+s+(s===100?' ok':' (normalised)'); e.style.color=s===100?'var(--accent)':'var(--a3)'; }
+}
+function onChange(){
+  syncLabels();
+  const stale=BT.recs&&BT.cfgKey!==cfgKey(); const b=$('btStale'); if(b) b.style.display=stale?'block':'none';
+  if(BT.recs&&!stale) renderOut();
+}
+
+/* ------------------------- rendering ------------------------- */
+const pc=(v,d=1)=>v==null||!isFinite(v)?'--':(v*100).toFixed(d)+'%';
+const f3=v=>v==null||!isFinite(v)?'--':v.toFixed(3);
+function card(title,val,sub,cls){ return '<div class="bt-card"><div class="bt-ct">'+title+'</div><div class="bt-cv '+(cls||'')+'">'+val+'</div><div class="bt-cs">'+(sub||'')+'</div></div>'; }
+function renderData(){
+  const el=$('btDataList'); if(!el) return;
+  if(!BT.leagues.length){ el.innerHTML='<div class="add-file-empty">No data loaded yet</div>'; return; }
+  el.innerHTML=BT.leagues.map(L=>'<div class="bt-dl"><b>'+L.label+'</b> <span>'+L.seasons.map((s,i)=>(i===0?'cur ':i===1?'last ':'prev ')+s.tag+': '+s.count).join(' &middot; ')+'</span></div>').join('');
+}
+function calSvg(b,title){
+  const W=170,H=170,pad=22; const x=p=>pad+p*(W-pad-6), y=p=>H-pad-p*(H-pad-6);
+  let s='<svg viewBox="0 0 '+W+' '+H+'" class="bt-cal"><text x="'+(W/2)+'" y="11" text-anchor="middle" class="bt-st">'+title+'</text>';
+  s+='<line x1="'+x(0)+'" y1="'+y(0)+'" x2="'+x(1)+'" y2="'+y(1)+'" stroke="rgba(255,255,255,.25)" stroke-dasharray="3 3"/>';
+  s+='<rect x="'+x(0)+'" y="'+y(1)+'" width="'+(x(1)-x(0))+'" height="'+(y(0)-y(1))+'" fill="none" stroke="rgba(255,255,255,.12)"/>';
+  for(const k of b){ if(k.n<5) continue; const px=k.p/k.n, py=k.y/k.n, r=Math.max(2.5,Math.min(7,Math.sqrt(k.n)/2.2)); s+='<circle cx="'+x(px)+'" cy="'+y(py)+'" r="'+r+'" fill="var(--accent)" fill-opacity=".8"/>'; }
+  s+='<text x="'+(W/2)+'" y="'+(H-4)+'" text-anchor="middle" class="bt-st">predicted</text><text x="8" y="'+(H/2)+'" class="bt-st" transform="rotate(-90 8 '+(H/2)+')" text-anchor="middle">actual</text></svg>';
+  return s;
+}
+function renderOut(){
+  const el=$('btOut'); if(!el) return;
+  if(!BT.recs){
+    el.innerHTML='<div class="empty"><div class="empty-icon">&#9878;</div><div class="empty-title">'+(BT.leagues.length?'Ready to backtest':'No data yet')+'</div><div class="empty-sub">'+
+      (BT.leagues.length?'Choose the seasons and settings on the left, then press Run Backtest.':'Load last season and current season from Google Drive (or drop CSV/XLSX files) using the buttons on the left.')+'</div></div>'; return; }
+  const ev=evaluate(BT.recs,postCfg()); BT.ev=ev;
+  if(!ev.n){ el.innerHTML='<div class="empty"><div class="empty-title">No games could be predicted</div><div class="empty-sub">Try a smaller warm-up value, or check the data covers the selected season.</div></div>'; return; }
+  const b=ev.btts,x=ev.x12,o=ev.ou25;
+  let h='<div class="bt-grid">';
+  h+=card('Games tested',ev.n.toLocaleString(),BT.skipped+' skipped (warm-up / unknown team)');
+  h+=card('BTTS accuracy',pc(b.acc),'Brier '+f3(b.brier)+' &middot; log loss '+f3(b.ll)+' (naive '+f3(b.baseLL)+')',b.ll<b.baseLL?'good':'bad');
+  h+=card('1X2 accuracy',x?pc(x.acc):'--',x?'log loss '+f3(x.ll)+' (naive '+f3(x.baseLL)+') &middot; home wins '+pc(x.homeRate,0):'',x&&x.ll<x.baseLL?'good':'bad');
+  h+=card('Over 2.5 accuracy',o?pc(o.acc):'--',o?'log loss '+f3(o.ll)+' (naive '+f3(o.baseLL)+')':'',o&&o.ll<o.baseLL?'good':'bad');
+  h+='</div>';
+  h+='<div class="bt-note">Log loss below the "naive" figure means the model beats simply guessing the average rate. Accuracy alone can flatter a model, so use log loss to compare settings.'+(ev.x12p?' Poisson-derived 1X2 for comparison: accuracy '+pc(ev.x12p.acc)+', log loss '+f3(ev.x12p.ll)+'.':'')+'</div>';
+  if(ev.book) h+='<div class="bt-sec">Model vs bookmaker (1X2, '+ev.book.n+' games with odds)</div><div class="bt-note">Bookmaker log loss <b>'+f3(ev.book.llBook)+'</b> vs model <b>'+f3(ev.book.llModel)+'</b> &middot; accuracy '+pc(ev.book.accBook)+' vs '+pc(ev.book.accModel)+'. Bookmakers are hard to beat; a model that is close is doing well.</div>';
+  // ROI
+  h+='<div class="bt-sec">Betting simulation (flat 1 unit, edge &ge; '+(postCfg().edge*100).toFixed(0)+'%)</div><div class="bt-note">Uses the average bookmaker odds in your files. Only 1X2 and Over/Under 2.5 have odds; BTTS has none, so it is scored on accuracy only.</div>';
+  const r=ev.roi, rr=(t)=>t.n?pc(t.profit/t.n):'--';
+  h+='<table class="bt-t"><tr><th>Market</th><th>Bets</th><th>Won</th><th>Profit (units)</th><th>ROI</th></tr>'+
+     '<tr><td>1X2 (best-edge outcome)</td><td>'+r.x12.n+'</td><td>'+(r.x12.n?pc(r.x12.win/r.x12.n):'--')+'</td><td>'+r.x12.profit.toFixed(1)+'</td><td class="'+(r.x12.profit>=0?'good':'bad')+'">'+rr(r.x12)+'</td></tr>'+
+     '<tr><td>Over/Under 2.5</td><td>'+r.ou.n+'</td><td>'+(r.ou.n?pc(r.ou.win/r.ou.n):'--')+'</td><td>'+r.ou.profit.toFixed(1)+'</td><td class="'+(r.ou.profit>=0?'good':'bad')+'">'+rr(r.ou)+'</td></tr></table>';
+  // signals
+  h+='<div class="bt-sec">Conservative signals (Over 3.5 / Under 1.5)</div><table class="bt-t"><tr><th>Threshold</th><th>Strong Over: games</th><th>hit rate</th><th>model avg</th><th>Strong Under: games</th><th>hit rate</th><th>model avg</th></tr>';
+  for(const s of ev.sweep){ const cur=Math.abs(s.t-postCfg().over35)<1e-9||Math.abs(s.t-postCfg().under15)<1e-9;
+    h+='<tr'+(cur?' class="cur"':'')+'><td>'+s.t.toFixed(2)+'</td><td>'+s.o.n+'</td><td>'+pc(s.o.hit)+'</td><td>'+pc(s.o.avgP)+'</td><td>'+s.u.n+'</td><td>'+pc(s.u.hit)+'</td><td>'+pc(s.u.avgP)+'</td></tr>'; }
+  h+='</table><div class="bt-note">"Hit rate" = how often the signal was right. If it sits well below "model avg", the model is overconfident at that threshold. Your current thresholds: Over 3.5 '+postCfg().over35.toFixed(2)+', Under 1.5 '+postCfg().under15.toFixed(2)+' (Over 3.5: '+ev.over.n+' signals, hit '+pc(ev.over.hit)+'; Under 1.5: '+ev.under.n+' signals, hit '+pc(ev.under.hit)+').</div>';
+  // confidence
+  h+='<div class="bt-sec">Does confidence mean anything? (BTTS accuracy by band)</div><table class="bt-t"><tr><th>Band</th><th>Games</th><th>BTTS accuracy</th><th>Log loss</th></tr>'+
+     ev.bands.map(k=>'<tr><td>'+k.lbl+'</td><td>'+k.n+'</td><td>'+(k.n?pc(k.acc):'--')+'</td><td>'+(k.n?f3(k.ll):'--')+'</td></tr>').join('')+'</table>'+
+     '<div class="bt-note">HIGH should be clearly more accurate than LOW. If not, the confidence weights are not adding value.</div>';
+  // calibration
+  h+='<div class="bt-sec">Calibration (dots on the dashed line = honest probabilities)</div><div class="bt-cals">'+calSvg(ev.calB,'BTTS')+calSvg(ev.calO,'Over 2.5')+calSvg(ev.calH,'Home win')+'</div>';
+  // spread
+  if(ev.spread&&ev.spread.length){ h+='<div class="bt-sec">Do predicted goals track actual goals?</div><table class="bt-t"><tr><th>Games grouped by predicted total goals</th><th>Games</th><th>Model predicted</th><th>Actually scored</th></tr>'+
+    ev.spread.map((s,i)=>'<tr><td>'+['Lowest 20%','Low','Middle','High','Highest 20%'][i]+'</td><td>'+s.n+'</td><td>'+s.pred.toFixed(2)+'</td><td>'+s.act.toFixed(2)+'</td></tr>').join('')+'</table>'+
+    '<div class="bt-note">A healthy model has the two columns moving together. If "Model predicted" ranges widely but "Actually scored" barely moves, the model is reading noise as signal, and the Over 3.5 / Under 1.5 signals will be unreliable.</div>'; }
+  // leagues
+  h+='<div class="bt-sec">By league</div><table class="bt-t"><tr><th>League</th><th>Games</th><th>BTTS acc</th><th>BTTS log loss</th><th>1X2 acc</th><th>O2.5 acc</th></tr>'+
+     ev.leagues.map(l=>'<tr><td>'+l.name+'</td><td>'+l.n+'</td><td>'+pc(l.btts)+'</td><td>'+f3(l.bttsLL)+'</td><td>'+pc(l.x12)+'</td><td>'+pc(l.ou)+'</td></tr>').join('')+'</table>';
+  if(BT.opt) h+=renderOpt();
+  $('btCsvBtn').disabled=false;
+  el.innerHTML=h;
+}
+function renderOpt(){
+  const o=BT.opt; let h='<div class="bt-sec">Best settings found</div>';
+  h+='<div class="bt-note">Tuned on <b>last season</b> only, then checked on <b>current season</b>. A good result is when the current-season score is also below 1.000 and not far worse than the tuning score; if it is much worse, the settings were overfitted and you should not trust them.</div>';
+  h+='<table class="bt-t"><tr><th>Setting</th><th>Value found</th><th>Your current</th></tr>'+
+     '<tr><td>Last N games</td><td>'+o.cfg.n+'</td><td>'+val('btN',10)+'</td></tr>'+
+     '<tr><td>Recency alpha</td><td>'+o.cfg.alpha.toFixed(2)+'</td><td>'+(val('btAlpha',85)/100).toFixed(2)+'</td></tr>'+
+     '<tr><td>Elo K-factor</td><td>'+o.cfg.eloK+'</td><td>'+val('btEloK',32)+'</td></tr>'+
+     '<tr><td>History window</td><td>'+(o.cfg.hist==='prev'?'this + previous season':'this season only')+'</td><td>'+($('btHist').value==='prev'?'this + previous season':'this season only')+'</td></tr>'+
+     '<tr><td>Weights Poisson / Elo / Form</td><td>'+o.weights.wP+' / '+o.weights.wE+' / '+o.weights.wF+'</td><td>'+val('btWP',50)+' / '+val('btWE',30)+' / '+val('btWF',20)+'</td></tr></table>';
+  h+='<div class="bt-note">Score tuned on last season: <b>'+f3(o.tuneScore)+'</b>'+(o.validate!=null?' &middot; same settings on current season: <b class="'+(o.validate<1?'good':'bad')+'">'+f3(o.validate)+'</b>':'')+(o.baseline!=null?' &middot; your current settings on current season: <b>'+f3(o.baseline)+'</b>':'')+'. Lower is better, below 1.000 beats a naive guess.</div>';
+  h+='<button class="run-btn" style="max-width:260px" onclick="BTApply()">Apply these to the Predictions page</button><div class="bt-note" id="btApplyMsg"></div>';
+  return h;
+}
+window.BTApply=function(){ if(BT.opt) applyToPredictions(BT.opt.cfg,BT.opt.weights); };
+
+/* ------------------------- actions ------------------------- */
+function prog(p,label){ const f=$('btProgFill'),l=$('btProgLbl'); if(f) f.style.width=Math.round(p*100)+'%'; if(l) l.textContent=label||''; }
+async function run(){
+  if(BT.busy||!BT.leagues.length) return; BT.busy=true; $('btRunBtn').disabled=true; $('btOptBtn').disabled=true; BT.opt=null;
+  const cfg=modelCfg(); prog(0,'Running backtest...');
+  try{ const {recs,skipped}=await runModel(cfg,p=>prog(p,'Running backtest... '+Math.round(p*100)+'%')); BT.recs=recs; BT.skipped=skipped; BT.cfgKey=JSON.stringify(cfg); prog(1,'Done: '+recs.length+' games'); }
+  catch(e){ console.error(e); prog(0,'Error: '+e.message); }
+  const b=$('btStale'); if(b) b.style.display='none'; renderOut(); BT.busy=false; $('btRunBtn').disabled=false; $('btOptBtn').disabled=false;
+}
+async function optimiseClick(){
+  if(BT.busy||!BT.leagues.length) return;
+  if(!BT.leagues.some(L=>L.seasons[1])){ prog(0,'Need a last season in the data to tune on.'); return; }
+  BT.busy=true; $('btRunBtn').disabled=true; $('btOptBtn').disabled=true;
+  const post=postCfg(), which=$('btObj').value;
+  const lim=Math.max(3,Math.round(val('btTuneN',12)));
+  const only=new Set(BT.leagues.filter(L=>L.seasons[1]).sort((a,b)=>b.seasons[1].count-a.seasons[1].count).slice(0,lim).map(L=>L.label));
+  const base={...modelCfg(),ranks:[1],only};
+  try{
+    const res=await optimise(base,post,which,m=>prog(BT._p||0,m),p=>{ BT._p=p; prog(p,'Searching settings... '+Math.round(p*100)+'%'); });
+    // validate on current season with the winning settings vs the user's current ones
+    prog(1,'Validating on current season...');
+    const wBest={...post,w:res.weights.w};
+    const vb=await runModel({...base,...res.cfg,ranks:[0]},null); const cb=await runModel({...base,ranks:[0]},null);
+    res.validate=vb.recs.length?objective(evaluate(vb.recs,wBest),which):null;
+    res.baseline=cb.recs.length?objective(evaluate(cb.recs,post),which):null;
+    BT.opt=res; prog(1,'Search finished');
+    // show results for the winning settings on both seasons
+    const c2={...modelCfg(),...res.cfg}; const full=await runModel(c2,null); BT.recs=full.recs; BT.skipped=full.skipped; BT.cfgKey=JSON.stringify(modelCfg());
+  }catch(e){ console.error(e); prog(0,'Error: '+e.message); }
+  BT.busy=false; $('btRunBtn').disabled=false; $('btOptBtn').disabled=false;
+  const b=$('btStale'); if(b) b.style.display='none'; renderOut();
+}
+function exportCsv(){
+  if(!BT.ev) return; const rows=[['league','season','date','home','away','hg','ag','btts_prob','p_home','p_draw','p_away','p_over25','confidence_pct','over35','under15']];
+  for(const d of BT.ev.D){ rows.push([d.r.league,d.r.season,d.r.date,d.r.home,d.r.away,d.r.hg,d.r.ag,d.pB.toFixed(4),d.eo?d.eo.hw.toFixed(4):'',d.eo?d.eo.draw.toFixed(4):'',d.eo?d.eo.aw.toFixed(4):'',d.r.pm?d.r.pm.o25.toFixed(4):'',(d.conf*100).toFixed(1),d.r.ou.over35,d.r.ou.under15]); }
+  const csv=rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\n');
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download='backtest_predictions.csv'; a.click();
+}
+
+/* ------------------------- tab switching + wiring ------------------------- */
+window.showPage=function(p){
+  const bt=p==='backtest';
+  $('predApp').style.display=bt?'none':''; $('btApp').style.display=bt?'':'none';
+  $('tabPred').classList.toggle('active',!bt); $('tabBt').classList.toggle('active',bt);
+  if(bt&&!BT._init){ BT._init=true; copyFromPredictions(); }
+};
+function wire(){
+  if(!$('btApp')) return;
+  $('btFolderId').value=(typeof DRIVE_FOLDER_ID!=='undefined'?DRIVE_FOLDER_ID:'');
+  try{ const f=JSON.parse(localStorage.getItem('btDrive')||'null'); if(f&&f.folder) $('btFolderId').value=f.folder; if(f&&f.skip!=null) $('btSkip').value=f.skip; }catch(e){}
+  $('btDriveBtn').addEventListener('click',loadDrive);
+  $('btFileIn').addEventListener('change',e=>{ loadLocal(Array.from(e.target.files)); e.target.value=''; });
+  $('btRunBtn').addEventListener('click',run); $('btOptBtn').addEventListener('click',optimiseClick);
+  $('btCopyBtn').addEventListener('click',copyFromPredictions); $('btCsvBtn').addEventListener('click',exportCsv);
+  document.querySelectorAll('#btApp [data-bt]').forEach(e=>e.addEventListener('input',onChange));
+  document.querySelectorAll('#btApp [data-bt]').forEach(e=>e.addEventListener('change',onChange));
+  syncLabels(); renderData(); renderOut();
+}
+BT._test={parseCSV,ingest,finalize,runModel,evaluate,objective,optimise,modelCfg,postCfg};
+if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',wire); else wire();
+})();
+
 </script>
 </body>
 </html>
