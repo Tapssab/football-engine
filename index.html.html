@@ -911,20 +911,37 @@ function driveFixStatus(msg, type) {
 
 // ── Helper: search + download one file from Drive ──────────────────
 async function driveDownloadFile(filename, token) {
-  const searchUrl = `https://www.googleapis.com/drive/v3/files?q=name='${filename}'+and+'${DRIVE_FOLDER_ID}'+in+parents+and+trashed=false&fields=files(id,name,modifiedTime)`;
+  // Build a valid Drive API query. Encode the entire q expression, not pieces
+  // of it, so the folder-parent condition is parsed correctly.
+  const safeName = filename.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  const q = `name = '${safeName}' and '${DRIVE_FOLDER_ID}' in parents and trashed = false`;
+  const searchUrl = 'https://www.googleapis.com/drive/v3/files?q=' +
+    encodeURIComponent(q) +
+    '&pageSize=100&orderBy=modifiedTime desc&fields=' +
+    encodeURIComponent('files(id,name,mimeType,modifiedTime)');
   const searchRes = await fetch(searchUrl, { headers: { Authorization: 'Bearer ' + token } });
   const searchData = await searchRes.json();
 
-  if (searchData.error) throw new Error(`Drive API: ${JSON.stringify(searchData.error)}`);
+  if (!searchRes.ok || searchData.error) {
+    throw new Error(`Drive search failed (HTTP ${searchRes.status}): ` +
+      (searchData.error?.message || JSON.stringify(searchData.error || searchData)));
+  }
   if (!searchData.files || searchData.files.length === 0) return null; // not found
 
-  const fileId = searchData.files[0].id;
-  const modified = new Date(searchData.files[0].modifiedTime).toLocaleDateString();
+  const file = searchData.files[0];
+  const fileId = file.id;
+  const modified = file.modifiedTime ? new Date(file.modifiedTime).toLocaleDateString() : 'unknown';
 
-  const dlRes = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
-    headers: { Authorization: 'Bearer ' + token }
-  });
-  if (!dlRes.ok) throw new Error(`Download failed: HTTP ${dlRes.status}`);
+  // Google Sheets files need the export endpoint; uploaded XLSX files use alt=media.
+  const isGoogleSheet = file.mimeType === 'application/vnd.google-apps.spreadsheet';
+  const downloadUrl = isGoogleSheet
+    ? `https://www.googleapis.com/drive/v3/files/${fileId}/export?mimeType=${encodeURIComponent('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')}`
+    : `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`;
+  const dlRes = await fetch(downloadUrl, { headers: { Authorization: 'Bearer ' + token } });
+  if (!dlRes.ok) {
+    const detail = await dlRes.text().catch(() => '');
+    throw new Error(`Download failed for ${filename} (HTTP ${dlRes.status})${detail ? ': ' + detail : ''}`);
+  }
 
   const arrayBuffer = await dlRes.arrayBuffer();
   const wb = XLSX.read(arrayBuffer, { type: 'array' });
@@ -989,7 +1006,7 @@ async function loadFromDrive() {
     }
 
   } catch (e) {
-    driveStatus('Sign-in failed or cancelled', 'err');
+    driveStatus('Drive load failed: ' + e.message, 'err');
     log('Drive: ' + e.message, 'err');
   }
 
